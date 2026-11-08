@@ -1,0 +1,10 @@
+##### setup: azure-removed
+--- exit: 1
+--- stdout
+ERROR: Unknown provider 'azure'
+Valid providers: elevenlabs openai google amazon edge kitten mimo tada fish gemini local
+--- stderr
+--- queue
+--- config
+(none)
+--- stub log

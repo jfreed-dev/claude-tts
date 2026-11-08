@@ -27,7 +27,6 @@ if [[ -z "$PROVIDER" ]]; then
   echo "  openai      — OpenAI TTS"
   echo "  google      — Google Cloud Text-to-Speech"
   echo "  amazon      — Amazon Polly (uses AWS CLI creds)"
-  echo "  azure       — Azure Cognitive Services Speech"
   echo "  edge        — Microsoft Edge TTS (free, no key needed)"
   echo "  kitten      — Kitten TTS V0.8 (free, local, no key needed)"
   echo "  mimo        — Xiaomi MiMo-V2-TTS (expressive, free limited time)"
@@ -66,7 +65,6 @@ if tts_provider_needs_key "$PROVIDER" && [[ -z "$API_KEY" ]]; then
     elevenlabs) echo "Get your key at: https://elevenlabs.io/app/settings/api-keys" ;;
     openai)     echo "Get your key at: https://platform.openai.com/api-keys" ;;
     google)     echo "Get your key at: https://console.cloud.google.com/apis/credentials" ;;
-    azure)      echo "Get your key at: https://portal.azure.com/#view/Microsoft_Azure_ProjectOxford/CognitiveServicesHub" ;;
     mimo)       echo "Get your key at: https://platform.xiaomimimo.com/#/console/api-keys" ;;
     fish)       echo "Get your key at: https://fish.audio (Dashboard → API Keys)" ;;
     gemini)     echo "Get your key at: https://aistudio.google.com/apikey" ;;
@@ -218,7 +216,6 @@ TEST_TEXT="Claude TTS is now set up and working."
 TEST_FILE="${QUEUE_DIR}/test_setup.$(tts_provider_audio_ext "$PROVIDER")"
 TEST_VOICE=$(tts_provider_default voice "$PROVIDER")
 TEST_MODEL=$(tts_provider_default model "$PROVIDER")
-TEST_REGION=$(tts_provider_default region "$PROVIDER")
 HTTP_CODE="000"
 RUN_TEST=true
 
@@ -231,13 +228,6 @@ case "$PROVIDER" in
       echo "AWS CLI not found. Install with: $(install_hint awscli)"
       RUN_TEST=false
     fi
-    ;;
-  azure)
-    # Kept from the previous test block to preserve behavior: the config
-    # written above has no region: line, so grep exits 1 and
-    # set -euo pipefail stops setup here with status 1.
-    TEST_REGION=$(grep '^region:' "$CONFIG_FILE" 2>/dev/null | head -1 | sed -E 's/^region:[[:space:]]*"?([^"]*)"?/\1/')
-    TEST_REGION="${TEST_REGION:-eastus}"
     ;;
   edge)
     if ! command -v edge-tts &>/dev/null; then
@@ -313,7 +303,7 @@ if [[ "$RUN_TEST" == true ]]; then
   TTS_CURL_MAX_TIME=15
   # shellcheck disable=SC2034
   TTS_SYNTH_VERBOSE=1
-  tts_synth "$PROVIDER" "$TEST_FILE" "$TEST_TEXT" "$TEST_VOICE" "$TEST_MODEL" "$TEST_REGION" "$API_KEY" || true
+  tts_synth "$PROVIDER" "$TEST_FILE" "$TEST_TEXT" "$TEST_VOICE" "$TEST_MODEL" "$API_KEY" || true
   HTTP_CODE="$TTS_HTTP_CODE"
 fi
 

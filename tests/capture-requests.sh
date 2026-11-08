@@ -215,7 +215,7 @@ setup() {
   report true
 }
 
-NON_LOCAL="elevenlabs openai google amazon azure edge kitten mimo tada fish gemini"
+NON_LOCAL="elevenlabs openai google amazon edge kitten mimo tada fish gemini"
 ALL_PROVIDERS="${NON_LOCAL} local"
 
 run_all() {
@@ -252,6 +252,9 @@ api_key: \"KEY-openai\"" CLAUDE_TTS_API_KEY=KEY-from-env
   # (g) unknown provider with a key falls back to local
   worker "g-bogus-provider" "provider: \"bogus\"
 api_key: \"KEY-bogus\""
+  worker "g-azure-provider-removed" "provider: \"azure\"
+api_key: \"KEY-azure\"
+region: \"eastus\""
 
   # (h) key-requiring provider with no key falls back to local
   worker "h-openai-no-key" "provider: \"openai\""
@@ -260,9 +263,7 @@ api_key: \"KEY-bogus\""
   worker "i-openai-http-500" "provider: \"openai\"
 api_key: \"KEY-openai\"" STUB_HTTP_CODE=500
 
-  # (j) HTTP 201: azure accepts it, openai does not
-  worker "j-azure-http-201" "provider: \"azure\"
-api_key: \"KEY-azure\"" STUB_HTTP_CODE=201
+  # (j) HTTP 201 is not a success
   worker "j-openai-http-201" "provider: \"openai\"
 api_key: \"KEY-openai\"" STUB_HTTP_CODE=201
 
@@ -280,6 +281,7 @@ api_key: \"KEY-openai\""
   done
   setup "no-args" --
   setup "bogus-provider" -- bogus KEY-bogus
+  setup "azure-removed" -- azure KEY-azure
   setup "openai-no-key" -- openai
   setup "say" -- say
   setup "openai-http-401" STUB_HTTP_CODE=401 -- openai KEY-openai

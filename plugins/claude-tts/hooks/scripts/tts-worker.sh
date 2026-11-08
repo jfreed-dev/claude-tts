@@ -49,7 +49,6 @@ PROVIDER=""
 API_KEY=""
 VOICE_ID=""
 MODEL_ID=""
-REGION=""
 
 # Parse config file
 if [[ -f "$CONFIG_FILE" ]]; then
@@ -57,7 +56,6 @@ if [[ -f "$CONFIG_FILE" ]]; then
   API_KEY=$(grep '^api_key:' "$CONFIG_FILE" | head -1 | sed -E 's/^api_key:[[:space:]]*"?([^"]*)"?/\1/')
   VOICE_ID=$(grep '^voice_id:' "$CONFIG_FILE" | head -1 | sed -E 's/^voice_id:[[:space:]]*"?([^"]*)"?/\1/')
   MODEL_ID=$(grep '^model_id:' "$CONFIG_FILE" | head -1 | sed -E 's/^model_id:[[:space:]]*"?([^"]*)"?/\1/')
-  REGION=$(grep '^region:' "$CONFIG_FILE" | head -1 | sed -E 's/^region:[[:space:]]*"?([^"]*)"?/\1/')
 
   # Legacy migration: elevenlabs_api_key without provider → elevenlabs
   if [[ -z "$PROVIDER" ]]; then
@@ -86,7 +84,6 @@ fi
 # --- Provider Defaults ---
 [[ -z "$VOICE_ID" ]] && VOICE_ID=$(tts_provider_default voice "$PROVIDER")
 [[ -z "$MODEL_ID" ]] && MODEL_ID=$(tts_provider_default model "$PROVIDER")
-[[ -z "$REGION" ]] && REGION=$(tts_provider_default region "$PROVIDER")
 
 # --- Queue Setup ---
 QUEUE_DIR="${TMPDIR:-/tmp}/claude_tts_queue"
@@ -137,7 +134,7 @@ tts_local_fallback() {
 # --- Provider Dispatch ---
 if [[ "$PROVIDER" != "local" ]] && { [[ -n "$API_KEY" ]] || ! tts_provider_needs_key "$PROVIDER"; }; then
   AUDIO_FILE="${QUEUE_DIR}/${SEQ_PADDED}.$(tts_provider_audio_ext "$PROVIDER")"
-  tts_synth "$PROVIDER" "$AUDIO_FILE" "$CLEANED" "$VOICE_ID" "$MODEL_ID" "$REGION" "$API_KEY" || USE_FALLBACK=true
+  tts_synth "$PROVIDER" "$AUDIO_FILE" "$CLEANED" "$VOICE_ID" "$MODEL_ID" "$API_KEY" || USE_FALLBACK=true
 else
   USE_FALLBACK=true
 fi

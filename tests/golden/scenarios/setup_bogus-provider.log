@@ -2,7 +2,7 @@
 --- exit: 1
 --- stdout
 ERROR: Unknown provider 'bogus'
-Valid providers: elevenlabs openai google amazon azure edge kitten mimo tada fish gemini local
+Valid providers: elevenlabs openai google amazon edge kitten mimo tada fish gemini local
 --- stderr
 --- queue
 --- config
