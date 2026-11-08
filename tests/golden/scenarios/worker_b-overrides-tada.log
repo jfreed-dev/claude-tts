@@ -1,0 +1,58 @@
+##### worker: b-overrides-tada
+--- exit: 0
+--- stdout
+--- stderr
+--- queue
+.seq
+000001.wav
+daemon.pid
+--- stub log
+=== python3 (tada)
+
+import os, sys, torch, torchaudio
+from tada.modules.encoder import EncoderOutput
+from tada.modules.tada import TadaForCausalLM
+
+text = os.environ['TADA_TEXT']
+output_path = os.environ['TADA_OUTPUT']
+model_name = 'HumeAI/' + os.environ.get('TADA_MODEL', 'tada-1b')
+ref_audio_path = os.environ.get('TADA_REF_AUDIO', '')
+cache_path = os.environ.get('TADA_CACHE', '')
+
+if torch.cuda.is_available():
+    device, dtype = 'cuda', torch.bfloat16
+elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+    device, dtype = 'mps', torch.float32
+else:
+    device, dtype = 'cpu', torch.float32
+
+if cache_path and os.path.exists(cache_path):
+    prompt = EncoderOutput.load(cache_path, device=device)
+else:
+    from tada.modules.encoder import Encoder
+    if not ref_audio_path or not os.path.exists(ref_audio_path):
+        sys.exit(1)
+    encoder = Encoder.from_pretrained('HumeAI/tada-codec', subfolder='encoder').to(device)
+    audio, sr = torchaudio.load(ref_audio_path)
+    audio = audio.to(device)
+    prompt = encoder(audio, sample_rate=sr)
+    if cache_path:
+        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+        prompt.save(cache_path)
+    del encoder
+
+model = TadaForCausalLM.from_pretrained(model_name, torch_dtype=dtype).to(device)
+if hasattr(model, 'decoder'):
+    model.decoder.to(device)
+output = model.generate(prompt=prompt, text=text)
+wav = output.audio[0].detach().cpu().float()
+if wav.dim() == 1:
+    wav = wav.unsqueeze(0)
+torchaudio.save(output_path, wav, 24000)
+
+--- env
+TADA_CACHE=<T>/home/.claude/tada-prompt-cache.pt
+TADA_MODEL=M-x
+TADA_OUTPUT=<T>/tmp/claude_tts_queue/000001.wav
+TADA_REF_AUDIO=V-x
+TADA_TEXT=Build summary Here is bold and italic text with and a [docs link]( First item done Second item done Numbered step one Details at for later.

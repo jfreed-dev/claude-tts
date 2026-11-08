@@ -1,0 +1,51 @@
+##### setup: provider-fish
+--- exit: 0
+--- stdout
+Config written to: <T>/home/.claude/claude-tts.local.md
+TTS enabled with provider: fish
+
+Testing TTS pipeline...
+fish API: OK (8328 bytes)
+Playing test audio...
+
+Setup complete! TTS is ready.
+--- stderr
+--- queue
+--- config
+---
+provider: "fish"
+api_key: "KEY-fish"
+voice_id: ""
+model_id: "s2-pro"
+---
+
+Claude TTS configuration. Provider: Fish Audio.
+voice_id: reference voice ID (leave empty for default, or use a voice ID from fish.audio)
+model_id: s2-pro (flagship) or s2 (faster)
+Supports 80+ languages, voice cloning, and emotional tags like [excited] [whisper].
+--- stub log
+=== curl
+[-s]
+[-w]
+[%{http_code}]
+[-o]
+[<T>/tmp/claude_tts_queue/test_setup.mp3]
+[--max-time]
+[15]
+[-X]
+[POST]
+[https://api.fish.audio/v1/tts]
+[-H]
+[Authorization: Bearer KEY-fish]
+[-H]
+[Content-Type: application/json]
+[-H]
+[model: s2-pro]
+[-d]
+[{
+  "text": "Claude TTS is now set up and working.",
+  "format": "mp3"
+}]
+=== mpv
+[--no-terminal]
+[<T>/tmp/claude_tts_queue/test_setup.mp3]

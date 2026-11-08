@@ -1,0 +1,36 @@
+##### setup: provider-amazon
+--- exit: 0
+--- stdout
+Config written to: <T>/home/.claude/claude-tts.local.md
+TTS enabled with provider: amazon
+
+Testing TTS pipeline...
+amazon API: OK (2048 bytes)
+Playing test audio...
+
+Setup complete! TTS is ready.
+--- stderr
+--- queue
+--- config
+---
+provider: "amazon"
+---
+
+Claude TTS configuration. Provider: Amazon Polly.
+Uses AWS CLI credentials (aws configure).
+--- stub log
+=== aws
+[polly]
+[synthesize-speech]
+[--output-format]
+[mp3]
+[--voice-id]
+[Joanna]
+[--engine]
+[neural]
+[--text]
+[Claude TTS is now set up and working.]
+[<T>/tmp/claude_tts_queue/test_setup.mp3]
+=== mpv
+[--no-terminal]
+[<T>/tmp/claude_tts_queue/test_setup.mp3]

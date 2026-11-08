@@ -1,0 +1,16 @@
+##### worker: b-overrides-edge
+--- exit: 0
+--- stdout
+--- stderr
+--- queue
+.seq
+000001.mp3
+daemon.pid
+--- stub log
+=== edge-tts
+[--voice]
+[V-x]
+[--text]
+[Build summary Here is bold and italic text with and a [docs link]( First item done Second item done Numbered step one Details at for later.]
+[--write-media]
+[<T>/tmp/claude_tts_queue/000001.mp3]

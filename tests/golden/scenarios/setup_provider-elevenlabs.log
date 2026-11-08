@@ -1,0 +1,45 @@
+##### setup: provider-elevenlabs
+--- exit: 0
+--- stdout
+Config written to: <T>/home/.claude/claude-tts.local.md
+TTS enabled with provider: elevenlabs
+
+Testing TTS pipeline...
+elevenlabs API: OK (8328 bytes)
+Playing test audio...
+
+Setup complete! TTS is ready.
+--- stderr
+--- queue
+--- config
+---
+provider: "elevenlabs"
+api_key: "KEY-elevenlabs"
+---
+
+Claude TTS configuration. Provider: elevenlabs.
+Edit voice_id and model_id above to customize.
+--- stub log
+=== curl
+[-s]
+[-w]
+[%{http_code}]
+[-o]
+[<T>/tmp/claude_tts_queue/test_setup.mp3]
+[--max-time]
+[15]
+[-X]
+[POST]
+[https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM]
+[-H]
+[xi-api-key: KEY-elevenlabs]
+[-H]
+[Content-Type: application/json]
+[-d]
+[{
+  "text": "Claude TTS is now set up and working.",
+  "model_id": "eleven_flash_v2_5"
+}]
+=== mpv
+[--no-terminal]
+[<T>/tmp/claude_tts_queue/test_setup.mp3]

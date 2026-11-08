@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # capture-requests.sh: run tts-worker.sh and tts-setup.sh against stubbed
 # commands and print a normalized transcript of every external request.
-# Usage: capture-requests.sh [--update]
-#   --update  rewrite tests/golden/requests.log instead of printing
+# Usage: capture-requests.sh [--update | --split DIR]
+#   (no argument)  print the transcript
+#   --split DIR    write DIR/scenarios.txt and DIR/scenarios/<slug>.log
+#   --update       rewrite tests/golden the same way
 #
 # All external commands that could reach the network or change the system
 # (curl, aws, edge-tts, python3 model scripts, package managers) are stubs.
@@ -15,7 +17,7 @@ TESTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${TESTS_DIR}/.." && pwd)"
 WORKER="${REPO_ROOT}/plugins/claude-tts/hooks/scripts/tts-worker.sh"
 SETUP="${REPO_ROOT}/plugins/claude-tts/scripts/tts-setup.sh"
-GOLDEN="${TESTS_DIR}/golden/requests.log"
+GOLDEN_DIR="${TESTS_DIR}/golden"
 REAL_PYTHON3="$(command -v python3)"
 
 ROOT="$(mktemp -d "${TMPDIR:-/tmp}/tts-capture.XXXXXX")"
@@ -283,13 +285,43 @@ api_key: \"KEY-openai\""
   setup "openai-http-401" STUB_HTTP_CODE=401 -- openai KEY-openai
 }
 
+# split_transcript DIR: read a transcript on stdin and write DIR/scenarios.txt
+# (slugs in run order) and DIR/scenarios/<slug>.log (each section, header
+# included). The slug is the label after "##### " with every run of
+# characters outside [A-Za-z0-9._-] replaced by "_".
+split_transcript() {
+  local dir="$1"
+  mkdir -p "${dir}/scenarios"
+  awk -v d="$dir" '
+    /^##### / {
+      if (f != "") close(f)
+      s = substr($0, 7)
+      gsub(/[^A-Za-z0-9._-]+/, "_", s)
+      if (s in seen) {
+        print "duplicate scenario slug: " s > "/dev/stderr"
+        exit 1
+      }
+      seen[s] = 1
+      print s > (d "/scenarios.txt")
+      f = d "/scenarios/" s ".log"
+    }
+    f != "" { print > f }
+  '
+}
+
 build_fixture
 build_stubs
 
-if [[ "${1:-}" == "--update" ]]; then
-  mkdir -p "$(dirname "$GOLDEN")"
-  run_all > "$GOLDEN"
-  echo "Updated ${GOLDEN}"
-else
-  run_all
-fi
+case "${1:-}" in
+  --update)
+    rm -f "${GOLDEN_DIR}/scenarios/"*.log "${GOLDEN_DIR}/scenarios.txt"
+    run_all | split_transcript "$GOLDEN_DIR" || exit 1
+    echo "Updated ${GOLDEN_DIR}"
+    ;;
+  --split)
+    run_all | split_transcript "${2:?--split needs a directory}" || exit 1
+    ;;
+  *)
+    run_all
+    ;;
+esac

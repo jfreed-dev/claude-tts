@@ -1,0 +1,39 @@
+##### setup: provider-kitten
+--- exit: 0
+--- stdout
+Config written to: <T>/home/.claude/claude-tts.local.md
+TTS enabled with provider: kitten
+
+Testing TTS pipeline...
+kitten API: OK (2048 bytes)
+Playing test audio...
+
+Setup complete! TTS is ready.
+--- stderr
+--- queue
+--- config
+---
+provider: "kitten"
+voice_id: "expr-voice-2-f"
+---
+
+Claude TTS configuration. Provider: Kitten TTS V0.8.
+Requires: pip install KittenTTS soundfile
+System dep: espeak (brew install espeak / apt install espeak)
+Voices: expr-voice-2-m, expr-voice-2-f, expr-voice-3-m, expr-voice-3-f, expr-voice-4-m, expr-voice-4-f, expr-voice-5-m, expr-voice-5-f
+--- stub log
+=== python3 (kitten)
+
+import os, soundfile as sf
+from kittentts import KittenTTS
+model = KittenTTS()
+audio = model.generate(text=os.environ['KITTEN_TEXT'], voice=os.environ['KITTEN_VOICE'], speed=1.0)
+sf.write(os.environ['KITTEN_OUTPUT'], audio, 24000)
+
+--- env
+KITTEN_OUTPUT=<T>/tmp/claude_tts_queue/test_setup.wav
+KITTEN_TEXT=Claude TTS is now set up and working.
+KITTEN_VOICE=expr-voice-2-f
+=== mpv
+[--no-terminal]
+[<T>/tmp/claude_tts_queue/test_setup.wav]

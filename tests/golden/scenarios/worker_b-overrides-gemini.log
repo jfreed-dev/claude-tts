@@ -1,0 +1,64 @@
+##### worker: b-overrides-gemini
+--- exit: 0
+--- stdout
+--- stderr
+--- queue
+.seq
+000001.wav
+daemon.pid
+--- stub log
+=== curl
+[-s]
+[-w]
+[%{http_code}]
+[-o]
+[<MKTEMP>]
+[--max-time]
+[30]
+[-X]
+[POST]
+[https://generativelanguage.googleapis.com/v1beta/models/M-x:generateContent]
+[-H]
+[x-goog-api-key: KEY-gemini]
+[-H]
+[Content-Type: application/json]
+[-d]
+[{
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "Build summary Here is bold and italic text with and a [docs link]( First item done Second item done Numbered step one Details at for later."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "responseModalities": [
+      "AUDIO"
+    ],
+    "speechConfig": {
+      "voiceConfig": {
+        "prebuiltVoiceConfig": {
+          "voiceName": "V-x"
+        }
+      }
+    }
+  }
+}]
+=== python3
+[-c]
+[
+import struct, sys
+pcm = open(sys.argv[1], 'rb').read()
+with open(sys.argv[2], 'wb') as f:
+    f.write(b'RIFF')
+    f.write(struct.pack('<I', len(pcm) + 36))
+    f.write(b'WAVEfmt ')
+    f.write(struct.pack('<IHHIIHH', 16, 1, 1, 24000, 48000, 2, 16))
+    f.write(b'data')
+    f.write(struct.pack('<I', len(pcm)))
+    f.write(pcm)
+]
+[<MKTEMP>]
+[<T>/tmp/claude_tts_queue/000001.wav]

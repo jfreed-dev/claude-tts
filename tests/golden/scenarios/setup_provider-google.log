@@ -1,0 +1,53 @@
+##### setup: provider-google
+--- exit: 0
+--- stdout
+Config written to: <T>/home/.claude/claude-tts.local.md
+TTS enabled with provider: google
+
+Testing TTS pipeline...
+google API: OK (2048 bytes)
+Playing test audio...
+
+Setup complete! TTS is ready.
+--- stderr
+--- queue
+--- config
+---
+provider: "google"
+api_key: "KEY-google"
+---
+
+Claude TTS configuration. Provider: google.
+Edit voice_id and model_id above to customize.
+--- stub log
+=== curl
+[-s]
+[-w]
+[%{http_code}]
+[-o]
+[<MKTEMP>]
+[--max-time]
+[15]
+[-X]
+[POST]
+[https://texttospeech.googleapis.com/v1/text:synthesize]
+[-H]
+[X-Goog-Api-Key: KEY-google]
+[-H]
+[Content-Type: application/json]
+[-d]
+[{
+  "input": {
+    "text": "Claude TTS is now set up and working."
+  },
+  "voice": {
+    "languageCode": "en-US",
+    "name": "en-US-Neural2-F"
+  },
+  "audioConfig": {
+    "audioEncoding": "MP3"
+  }
+}]
+=== mpv
+[--no-terminal]
+[<T>/tmp/claude_tts_queue/test_setup.mp3]

@@ -1,0 +1,84 @@
+##### setup: provider-gemini
+--- exit: 0
+--- stdout
+Config written to: <T>/home/.claude/claude-tts.local.md
+TTS enabled with provider: gemini
+
+Testing TTS pipeline...
+gemini API: OK (2092 bytes)
+Playing test audio...
+
+Setup complete! TTS is ready.
+--- stderr
+--- queue
+--- config
+---
+provider: "gemini"
+api_key: "KEY-gemini"
+voice_id: "Kore"
+model_id: "gemini-3.1-flash-tts-preview"
+---
+
+Claude TTS configuration. Provider: Google Gemini 3.1 Flash TTS.
+voice_id: Kore (default). Available voices: Zephyr, Puck, Charon, Kore, Fenrir, Leda, Orus, Aoede, Callirrhoe, Autonoe, Enceladus, Iapetus, Umbriel, Algieba, Despina, Erinome, Algenib, Rasalgethi, Laomedeia, Achernar, Alnilam, Schedar, Gacrux, Pulcherrima, Achird, Zubenelgenubi, Vindemiatrix, Sadachbia, Sadaltager, Sulafat
+model_id: gemini-3.1-flash-tts-preview (latest) or gemini-2.5-flash-preview-tts or gemini-2.5-pro-preview-tts
+Supports 70+ languages, multi-speaker dialogue, and audio tags like [whispers] [laughs].
+--- stub log
+=== curl
+[-s]
+[-w]
+[%{http_code}]
+[-o]
+[<MKTEMP>]
+[--max-time]
+[15]
+[-X]
+[POST]
+[https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent]
+[-H]
+[x-goog-api-key: KEY-gemini]
+[-H]
+[Content-Type: application/json]
+[-d]
+[{
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "Claude TTS is now set up and working."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "responseModalities": [
+      "AUDIO"
+    ],
+    "speechConfig": {
+      "voiceConfig": {
+        "prebuiltVoiceConfig": {
+          "voiceName": "Kore"
+        }
+      }
+    }
+  }
+}]
+=== python3
+[-c]
+[
+import struct, sys
+pcm = open(sys.argv[1], 'rb').read()
+with open(sys.argv[2], 'wb') as f:
+    f.write(b'RIFF')
+    f.write(struct.pack('<I', len(pcm) + 36))
+    f.write(b'WAVEfmt ')
+    f.write(struct.pack('<IHHIIHH', 16, 1, 1, 24000, 48000, 2, 16))
+    f.write(b'data')
+    f.write(struct.pack('<I', len(pcm)))
+    f.write(pcm)
+]
+[<MKTEMP>]
+[<T>/tmp/claude_tts_queue/test_setup.wav]
+=== mpv
+[--no-terminal]
+[<T>/tmp/claude_tts_queue/test_setup.wav]

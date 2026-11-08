@@ -1,0 +1,37 @@
+##### worker: a-defaults-google
+--- exit: 0
+--- stdout
+--- stderr
+--- queue
+.seq
+000001.mp3
+daemon.pid
+--- stub log
+=== curl
+[-s]
+[-w]
+[%{http_code}]
+[-o]
+[<MKTEMP>]
+[--max-time]
+[30]
+[-X]
+[POST]
+[https://texttospeech.googleapis.com/v1/text:synthesize]
+[-H]
+[X-Goog-Api-Key: KEY-google]
+[-H]
+[Content-Type: application/json]
+[-d]
+[{
+  "input": {
+    "text": "Build summary Here is bold and italic text with and a [docs link]( First item done Second item done Numbered step one Details at for later."
+  },
+  "voice": {
+    "languageCode": "en-US",
+    "name": "en-US-Neural2-F"
+  },
+  "audioConfig": {
+    "audioEncoding": "MP3"
+  }
+}]
