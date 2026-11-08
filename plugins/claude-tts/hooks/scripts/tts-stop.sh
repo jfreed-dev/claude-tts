@@ -4,25 +4,25 @@
 
 set -uo pipefail
 
-QUEUE_DIR="${TMPDIR:-/tmp}/claude_tts_queue"
+source "$(cd "$(dirname "$0")" && pwd)/common.sh"
 
 # Kill any running TTS workers (API calls in progress)
 pkill -f "tts-worker.sh" 2>/dev/null || true
 
 # Kill the queue daemon and its child audio players
-if [[ -f "${QUEUE_DIR}/daemon.pid" ]]; then
-  DAEMON_PID=$(cat "${QUEUE_DIR}/daemon.pid" 2>/dev/null || echo "")
+if [[ -f "$TTS_DAEMON_PID_FILE" ]]; then
+  DAEMON_PID=$(cat "$TTS_DAEMON_PID_FILE" 2>/dev/null || echo "")
   if [[ -n "$DAEMON_PID" ]] && kill -0 "$DAEMON_PID" 2>/dev/null; then
     # Kill children first (audio players: afplay, mpv, ffplay, etc.)
     pkill -P "$DAEMON_PID" 2>/dev/null || true
     # Then kill the daemon itself
     kill "$DAEMON_PID" 2>/dev/null || true
   fi
-  rm -f "${QUEUE_DIR}/daemon.pid"
+  rm -f "$TTS_DAEMON_PID_FILE"
 fi
 
 # Remove daemon lock so a new daemon can start
-rm -rf "${QUEUE_DIR}/.daemon_lock" 2>/dev/null || true
+rm -rf "$TTS_DAEMON_LOCK" 2>/dev/null || true
 
 # Kill audio player and TTS generator processes directly.
 # pkill -P only kills direct children; grandchild/orphan processes survive.
@@ -42,9 +42,9 @@ esac
 
 # Clear remaining queued audio files and reset sequence counter
 # Use find instead of glob to avoid zsh nomatch errors
-find "${QUEUE_DIR}" -maxdepth 1 -type f \( -name "*.mp3" -o -name "*.wav" -o -name ".seq" \) -delete 2>/dev/null || true
+find "${TTS_QUEUE_DIR}" -maxdepth 1 -type f \( -name "*.mp3" -o -name "*.wav" -o -name ".seq" \) -delete 2>/dev/null || true
 
 # Release hook lock since we killed the worker
-rm -rf "${TMPDIR:-/tmp}/claude_tts_hook.lock" 2>/dev/null || true
+rm -rf "$TTS_HOOK_LOCK" 2>/dev/null || true
 
 exit 0

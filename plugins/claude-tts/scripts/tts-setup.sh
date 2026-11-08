@@ -5,10 +5,10 @@
 set -euo pipefail
 
 PLUGIN_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-CONFIG_FILE="$HOME/.claude/claude-tts.local.md"
 
 # Source cross-platform abstraction layer
 source "${PLUGIN_ROOT}/hooks/scripts/platform.sh"
+source "${PLUGIN_ROOT}/hooks/scripts/common.sh"
 source "${PLUGIN_ROOT}/hooks/scripts/providers.sh"
 
 PROVIDER="${1:-}"
@@ -73,9 +73,9 @@ if tts_provider_needs_key "$PROVIDER" && [[ -z "$API_KEY" ]]; then
 fi
 
 # Write config file
-mkdir -p "$HOME/.claude"
+mkdir -p "$TTS_CLAUDE_DIR"
 if [[ "$PROVIDER" == "local" ]]; then
-  cat > "$CONFIG_FILE" << EOF
+  cat > "$TTS_CONFIG_FILE" << EOF
 ---
 provider: "local"
 ---
@@ -83,7 +83,7 @@ provider: "local"
 Claude TTS configuration. Provider: local system TTS.
 EOF
 elif [[ "$PROVIDER" == "amazon" ]]; then
-  cat > "$CONFIG_FILE" << EOF
+  cat > "$TTS_CONFIG_FILE" << EOF
 ---
 provider: "amazon"
 ---
@@ -92,7 +92,7 @@ Claude TTS configuration. Provider: Amazon Polly.
 Uses AWS CLI credentials (aws configure).
 EOF
 elif [[ "$PROVIDER" == "edge" ]]; then
-  cat > "$CONFIG_FILE" << EOF
+  cat > "$TTS_CONFIG_FILE" << EOF
 ---
 provider: "edge"
 ---
@@ -101,7 +101,7 @@ Claude TTS configuration. Provider: Microsoft Edge TTS.
 Requires: pip install edge-tts
 EOF
 elif [[ "$PROVIDER" == "kitten" ]]; then
-  cat > "$CONFIG_FILE" << EOF
+  cat > "$TTS_CONFIG_FILE" << EOF
 ---
 provider: "kitten"
 voice_id: "expr-voice-2-f"
@@ -113,7 +113,7 @@ System dep: espeak (brew install espeak / apt install espeak)
 Voices: expr-voice-2-m, expr-voice-2-f, expr-voice-3-m, expr-voice-3-f, expr-voice-4-m, expr-voice-4-f, expr-voice-5-m, expr-voice-5-f
 EOF
 elif [[ "$PROVIDER" == "mimo" ]]; then
-  cat > "$CONFIG_FILE" << EOF
+  cat > "$TTS_CONFIG_FILE" << EOF
 ---
 provider: "mimo"
 api_key: "${API_KEY}"
@@ -126,7 +126,7 @@ Voices: mimo_default, default_zh (Chinese female), default_en (English female)
 Style: prefix text with <style>Happy</style> etc. for expressive speech.
 EOF
 elif [[ "$PROVIDER" == "fish" ]]; then
-  cat > "$CONFIG_FILE" << EOF
+  cat > "$TTS_CONFIG_FILE" << EOF
 ---
 provider: "fish"
 api_key: "${API_KEY}"
@@ -140,7 +140,7 @@ model_id: s2-pro (flagship) or s2 (faster)
 Supports 80+ languages, voice cloning, and emotional tags like [excited] [whisper].
 EOF
 elif [[ "$PROVIDER" == "gemini" ]]; then
-  cat > "$CONFIG_FILE" << EOF
+  cat > "$TTS_CONFIG_FILE" << EOF
 ---
 provider: "gemini"
 api_key: "${API_KEY}"
@@ -170,8 +170,8 @@ elif [[ "$PROVIDER" == "tada" ]]; then
     fi
   fi
   # Remove stale prompt cache when reference changes
-  rm -f "$HOME/.claude/tada-prompt-cache.pt"
-  cat > "$CONFIG_FILE" << EOF
+  rm -f "$TTS_TADA_CACHE"
+  cat > "$TTS_CONFIG_FILE" << EOF
 ---
 provider: "tada"
 voice_id: "${ref_audio}"
@@ -185,7 +185,7 @@ model_id: tada-1b (English, smaller) or tada-3b-ml (multilingual, larger)
 GPU recommended (CUDA or Apple MPS). CPU works but is slow.
 EOF
 else
-  cat > "$CONFIG_FILE" << EOF
+  cat > "$TTS_CONFIG_FILE" << EOF
 ---
 provider: "${PROVIDER}"
 api_key: "${API_KEY}"
@@ -196,10 +196,10 @@ Edit voice_id and model_id above to customize.
 EOF
 fi
 
-echo "Config written to: $CONFIG_FILE"
+echo "Config written to: $TTS_CONFIG_FILE"
 
 # Enable TTS
-touch "$HOME/.claude/tts-enabled"
+touch "$TTS_ENABLED_FLAG"
 echo "TTS enabled with provider: $PROVIDER"
 
 # Make scripts executable
@@ -210,10 +210,9 @@ chmod +x "${PLUGIN_ROOT}/scripts/"*.sh
 echo ""
 echo "Testing TTS pipeline..."
 
-QUEUE_DIR="${TMPDIR:-/tmp}/claude_tts_queue"
-mkdir -p "$QUEUE_DIR"
+mkdir -p "$TTS_QUEUE_DIR"
 TEST_TEXT="Claude TTS is now set up and working."
-TEST_FILE="${QUEUE_DIR}/test_setup.$(tts_provider_audio_ext "$PROVIDER")"
+TEST_FILE="${TTS_QUEUE_DIR}/test_setup.$(tts_provider_audio_ext "$PROVIDER")"
 TEST_VOICE=$(tts_provider_default voice "$PROVIDER")
 TEST_MODEL=$(tts_provider_default model "$PROVIDER")
 HTTP_CODE="000"
