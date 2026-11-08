@@ -1,0 +1,13 @@
+##### status: keyless-local
+--- exit: 0
+--- stdout
+=== Claude TTS Status ===
+
+TTS:      DISABLED
+Provider: local
+API Key:  Not needed
+jq:       Installed (<JQ>)
+Platform: Linux
+Daemon:   Not running (starts automatically)
+Queued:   0 audio file(s)
+--- stderr

@@ -1,0 +1,38 @@
+##### setup: f-amazon-cli-fail
+--- exit: 0
+--- stdout
+Config written to: <T>/home/.claude/claude-tts.local.md
+TTS enabled with provider: amazon
+
+Testing TTS pipeline...
+amazon API: FAILED (HTTP 000)
+Check your API key and try again.
+
+Falling back to local TTS...
+Local TTS: OK
+
+Setup complete (with warnings). Check your API key if amazon didn't work.
+--- stderr
+--- queue
+--- config
+---
+provider: "amazon"
+---
+
+Claude TTS configuration. Provider: Amazon Polly.
+Uses AWS CLI credentials (aws configure).
+--- stub log
+=== aws
+[polly]
+[synthesize-speech]
+[--output-format]
+[mp3]
+[--voice-id]
+[Joanna]
+[--engine]
+[neural]
+[--text]
+[Claude TTS is now set up and working.]
+[<T>/tmp/claude_tts_queue/test_setup.mp3]
+=== espeak-ng
+[Claude TTS is now set up and working.]

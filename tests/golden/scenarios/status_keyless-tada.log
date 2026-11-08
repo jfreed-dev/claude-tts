@@ -1,0 +1,13 @@
+##### status: keyless-tada
+--- exit: 0
+--- stdout
+=== Claude TTS Status ===
+
+TTS:      DISABLED
+Provider: tada
+API Key:  NOT SET
+jq:       Installed (<JQ>)
+Platform: Linux
+Daemon:   Not running (starts automatically)
+Queued:   0 audio file(s)
+--- stderr

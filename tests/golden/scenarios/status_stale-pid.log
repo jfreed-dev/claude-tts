@@ -1,0 +1,13 @@
+##### status: stale-pid
+--- exit: 0
+--- stdout
+=== Claude TTS Status ===
+
+TTS:      DISABLED
+Provider: (not configured)
+API Key:  NOT SET
+jq:       Installed (<JQ>)
+Platform: Linux
+Daemon:   Stale PID file (not running)
+Queued:   0 audio file(s)
+--- stderr

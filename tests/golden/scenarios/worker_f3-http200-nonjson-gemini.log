@@ -1,0 +1,52 @@
+##### worker: f3-http200-nonjson-gemini
+--- exit: 0
+--- stdout
+--- stderr
+--- queue
+.seq
+000001.wav
+daemon.pid
+--- stub log
+=== curl
+[-s]
+[-w]
+[%{http_code}]
+[-o]
+[<MKTEMP>]
+[--max-time]
+[30]
+[-X]
+[POST]
+[https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent]
+[-H]
+[x-goog-api-key: KEY-gemini]
+[-H]
+[Content-Type: application/json]
+[-d]
+[{
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "Build summary Here is bold and italic text with and a [docs link]( First item done Second item done Numbered step one Details at for later."
+        }
+      ]
+    }
+  ],
+  "generationConfig": {
+    "responseModalities": [
+      "AUDIO"
+    ],
+    "speechConfig": {
+      "voiceConfig": {
+        "prebuiltVoiceConfig": {
+          "voiceName": "Kore"
+        }
+      }
+    }
+  }
+}]
+=== espeak-ng
+[-w]
+[<T>/tmp/claude_tts_queue/000001.wav]
+[Build summary Here is bold and italic text with and a [docs link]( First item done Second item done Numbered step one Details at for later.]

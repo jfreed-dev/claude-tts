@@ -1,0 +1,13 @@
+##### worker: f5-all-backends-fail-local
+--- exit: 1
+--- stdout
+--- stderr
+[claude-tts] All TTS backends failed
+--- queue
+.seq
+daemon.pid
+--- stub log
+=== espeak-ng
+[-w]
+[<T>/tmp/claude_tts_queue/000001.wav]
+[Build summary Here is bold and italic text with and a [docs link]( First item done Second item done Numbered step one Details at for later.]
