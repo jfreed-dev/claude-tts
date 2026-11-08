@@ -1,0 +1,295 @@
+#!/usr/bin/env bash
+# capture-requests.sh: run tts-worker.sh and tts-setup.sh against stubbed
+# commands and print a normalized transcript of every external request.
+# Usage: capture-requests.sh [--update]
+#   --update  rewrite tests/golden/requests.log instead of printing
+#
+# All external commands that could reach the network or change the system
+# (curl, aws, edge-tts, python3 model scripts, package managers) are stubs.
+# Each script runs under env -i, so real API keys never reach it.
+
+set -uo pipefail
+export LC_ALL=C
+
+TESTS_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "${TESTS_DIR}/.." && pwd)"
+WORKER="${REPO_ROOT}/plugins/claude-tts/hooks/scripts/tts-worker.sh"
+SETUP="${REPO_ROOT}/plugins/claude-tts/scripts/tts-setup.sh"
+GOLDEN="${TESTS_DIR}/golden/requests.log"
+REAL_PYTHON3="$(command -v python3)"
+
+ROOT="$(mktemp -d "${TMPDIR:-/tmp}/tts-capture.XXXXXX")"
+trap 'rm -rf "$ROOT"' EXIT
+STUBS="${ROOT}/stubs"
+RESPONSE="${ROOT}/response.json"
+mkdir -p "$STUBS"
+
+MESSAGE='# Build summary
+
+Here is **bold** and _italic_ text with `inline code` and a [docs link](https://example.com/docs).
+
+- First item done
+- Second item done
+
+1. Numbered step one
+Details at https://example.com/path for later.'
+
+# --- Fixture: one JSON response that satisfies every provider ---
+build_fixture() {
+  local blob
+  blob=$(head -c 2048 /dev/zero | tr '\0' 'A' | base64 | tr -d '\n')
+  printf '{"audioContent":"%s","choices":[{"message":{"audio":{"data":"%s"}}}],"candidates":[{"content":{"parts":[{"inlineData":{"data":"%s"}}]}}]}\n' \
+    "$blob" "$blob" "$blob" > "$RESPONSE"
+}
+
+# --- Stubs ---
+build_stubs() {
+  cat > "${STUBS}/curl" <<'EOF'
+#!/bin/bash
+{ echo "=== curl"; for a in "$@"; do printf '[%s]\n' "$a"; done; } >> "$STUB_LOG"
+out=""
+while [[ $# -gt 0 ]]; do
+  if [[ "$1" == "-o" && $# -ge 2 ]]; then out="$2"; shift; fi
+  shift
+done
+[[ -n "$out" ]] && cp "$STUB_RESPONSE" "$out"
+printf '%s' "${STUB_HTTP_CODE:-200}"
+exit 0
+EOF
+
+  cat > "${STUBS}/aws" <<'EOF'
+#!/bin/bash
+{ echo "=== aws"; for a in "$@"; do printf '[%s]\n' "$a"; done; } >> "$STUB_LOG"
+last=""
+for a in "$@"; do last="$a"; done
+[[ -n "$last" ]] && head -c 2048 /dev/zero | tr '\0' 'A' > "$last"
+exit 0
+EOF
+
+  cat > "${STUBS}/edge-tts" <<'EOF'
+#!/bin/bash
+{ echo "=== edge-tts"; for a in "$@"; do printf '[%s]\n' "$a"; done; } >> "$STUB_LOG"
+out=""
+while [[ $# -gt 0 ]]; do
+  if [[ "$1" == "--write-media" && $# -ge 2 ]]; then out="$2"; shift; fi
+  shift
+done
+[[ -n "$out" ]] && head -c 2048 /dev/zero | tr '\0' 'A' > "$out"
+exit 0
+EOF
+
+  cat > "${STUBS}/espeak-ng" <<'EOF'
+#!/bin/bash
+name=$(basename "$0")
+{ echo "=== $name"; for a in "$@"; do printf '[%s]\n' "$a"; done; } >> "$STUB_LOG"
+out=""
+while [[ $# -gt 0 ]]; do
+  if [[ "$1" == "-w" && $# -ge 2 ]]; then out="$2"; shift; fi
+  shift
+done
+[[ -n "$out" ]] && head -c 2048 /dev/zero | tr '\0' 'A' > "$out"
+exit 0
+EOF
+  cp "${STUBS}/espeak-ng" "${STUBS}/espeak"
+
+  cat > "${STUBS}/python3" <<'EOF'
+#!/bin/bash
+if [[ "${1:-}" == "-c" ]]; then
+  case "${2:-}" in
+    "import kittentts"|"import tada") exit 0 ;;
+  esac
+fi
+script="${2:-}"
+if [[ "$script" == *"from kittentts import"* ]]; then
+  { echo "=== python3 (kitten)"; printf '%s\n' "$script"; echo "--- env"; env | grep '^KITTEN_' | LC_ALL=C sort; } >> "$STUB_LOG"
+  head -c 2048 /dev/zero | tr '\0' 'A' > "$KITTEN_OUTPUT"
+  exit 0
+elif [[ "$script" == *"TadaForCausalLM"* ]]; then
+  { echo "=== python3 (tada)"; printf '%s\n' "$script"; echo "--- env"; env | grep '^TADA_' | LC_ALL=C sort; } >> "$STUB_LOG"
+  head -c 2048 /dev/zero | tr '\0' 'A' > "$TADA_OUTPUT"
+  exit 0
+fi
+{ echo "=== python3"; for a in "$@"; do printf '[%s]\n' "$a"; done; } >> "$STUB_LOG"
+exec "$REAL_PYTHON3" "$@"
+EOF
+
+  local p
+  for p in mpv ffplay paplay aplay afplay say piper; do
+    cat > "${STUBS}/${p}" <<'EOF'
+#!/bin/bash
+name=$(basename "$0")
+{ echo "=== $name"; for a in "$@"; do printf '[%s]\n' "$a"; done; } >> "$STUB_LOG"
+exit 0
+EOF
+  done
+
+  for p in sudo brew pip pip3 apt-get dnf pacman; do
+    cat > "${STUBS}/${p}" <<'EOF'
+#!/bin/bash
+name=$(basename "$0")
+echo "UNEXPECTED $name $*" >> "$STUB_LOG"
+exit 1
+EOF
+  done
+
+  chmod +x "${STUBS}"/*
+}
+
+# --- Scenario plumbing ---
+CASE_NUM=0
+T=""
+
+new_case() {
+  CASE_NUM=$((CASE_NUM + 1))
+  T="${ROOT}/case${CASE_NUM}"
+  mkdir -p "${T}/home/.claude" "${T}/tmp/claude_tts_queue"
+  : > "${T}/stub.log"
+  echo "##### $1"
+}
+
+normalize() {
+  sed "s#${T}#<T>#g" | sed -E 's#<T>/tmp/claude_tts_[a-z_]+\.[A-Za-z0-9]{6}#<MKTEMP>#g'
+}
+
+# invoke SCRIPT [VAR=value ...] -- [ARGS ...]
+invoke() {
+  local script="$1"
+  shift
+  local -a extra_env=()
+  while [[ $# -gt 0 && "$1" != "--" ]]; do
+    extra_env+=("$1")
+    shift
+  done
+  [[ $# -gt 0 ]] && shift
+  env -i PATH="${STUBS}:${PATH}" HOME="${T}/home" TMPDIR="${T}/tmp" \
+    STUB_LOG="${T}/stub.log" STUB_RESPONSE="$RESPONSE" REAL_PYTHON3="$REAL_PYTHON3" \
+    ${extra_env[@]+"${extra_env[@]}"} \
+    bash "$script" "$@" > "${T}/stdout" 2> "${T}/stderr"
+  echo "--- exit: $?"
+}
+
+report() {
+  local show_config="$1"
+  echo "--- stdout"
+  normalize < "${T}/stdout"
+  echo "--- stderr"
+  normalize < "${T}/stderr"
+  echo "--- queue"
+  ls -A "${T}/tmp/claude_tts_queue" | sort
+  if [[ "$show_config" == true ]]; then
+    echo "--- config"
+    if [[ -f "${T}/home/.claude/claude-tts.local.md" ]]; then
+      normalize < "${T}/home/.claude/claude-tts.local.md"
+    else
+      echo "(none)"
+    fi
+  fi
+  echo "--- stub log"
+  normalize < "${T}/stub.log"
+}
+
+# worker LABEL CONFIG [VAR=value ...]
+# CONFIG is the front matter body (empty for no config file). MSG overrides the message.
+worker() {
+  local label="$1" config="$2"
+  shift 2
+  new_case "worker: ${label}"
+  if [[ -n "$config" ]]; then
+    printf -- '---\n%s\n---\n' "$config" > "${T}/home/.claude/claude-tts.local.md"
+  fi
+  printf '%s\n' "${MSG:-$MESSAGE}" > "${T}/msg.txt"
+  # A live PID in daemon.pid stops the worker from spawning the queue daemon.
+  echo "$$" > "${T}/tmp/claude_tts_queue/daemon.pid"
+  invoke "$WORKER" "$@" -- "${T}/msg.txt"
+  report false
+}
+
+# setup LABEL [VAR=value ...] -- [ARGS ...]
+setup() {
+  local label="$1"
+  shift
+  new_case "setup: ${label}"
+  invoke "$SETUP" "$@"
+  report true
+}
+
+NON_LOCAL="elevenlabs openai google amazon azure edge kitten mimo tada fish gemini"
+ALL_PROVIDERS="${NON_LOCAL} local"
+
+run_all() {
+  local p
+
+  # (a) defaults: provider and key only
+  for p in $NON_LOCAL; do
+    worker "a-defaults-${p}" "provider: \"${p}\"
+api_key: \"KEY-${p}\""
+  done
+
+  # (b) explicit voice, model and region
+  for p in $NON_LOCAL; do
+    worker "b-overrides-${p}" "provider: \"${p}\"
+api_key: \"KEY-${p}\"
+voice_id: \"V-x\"
+model_id: \"M-x\"
+region: \"westeurope\""
+  done
+
+  # (c) legacy elevenlabs_api_key with no provider
+  worker "c-legacy-elevenlabs-key" "elevenlabs_api_key: \"KEY-legacy\""
+
+  # (d) CLAUDE_TTS_API_KEY overrides the config key
+  worker "d-env-key-override-openai" "provider: \"openai\"
+api_key: \"KEY-openai\"" CLAUDE_TTS_API_KEY=KEY-from-env
+
+  # (e) ELEVENLABS_API_KEY with no config file
+  worker "e-elevenlabs-env-no-config" "" ELEVENLABS_API_KEY=KEY-eleven-env
+
+  # (f) legacy "say" provider maps to local
+  worker "f-say-local" "provider: \"say\""
+
+  # (g) unknown provider with a key falls back to local
+  worker "g-bogus-provider" "provider: \"bogus\"
+api_key: \"KEY-bogus\""
+
+  # (h) key-requiring provider with no key falls back to local
+  worker "h-openai-no-key" "provider: \"openai\""
+
+  # (i) HTTP 500 falls back to local
+  worker "i-openai-http-500" "provider: \"openai\"
+api_key: \"KEY-openai\"" STUB_HTTP_CODE=500
+
+  # (j) HTTP 201: azure accepts it, openai does not
+  worker "j-azure-http-201" "provider: \"azure\"
+api_key: \"KEY-azure\"" STUB_HTTP_CODE=201
+  worker "j-openai-http-201" "provider: \"openai\"
+api_key: \"KEY-openai\"" STUB_HTTP_CODE=201
+
+  # (k) message too short to speak
+  MSG="hi" worker "k-short-message" "provider: \"openai\"
+api_key: \"KEY-openai\""
+
+  # Setup: every provider
+  for p in $ALL_PROVIDERS; do
+    if [[ "$p" == "tada" ]]; then
+      setup "provider-tada-no-arg" -- tada
+    else
+      setup "provider-${p}" -- "$p" "KEY-${p}"
+    fi
+  done
+  setup "no-args" --
+  setup "bogus-provider" -- bogus KEY-bogus
+  setup "openai-no-key" -- openai
+  setup "say" -- say
+  setup "openai-http-401" STUB_HTTP_CODE=401 -- openai KEY-openai
+}
+
+build_fixture
+build_stubs
+
+if [[ "${1:-}" == "--update" ]]; then
+  mkdir -p "$(dirname "$GOLDEN")"
+  run_all > "$GOLDEN"
+  echo "Updated ${GOLDEN}"
+else
+  run_all
+fi

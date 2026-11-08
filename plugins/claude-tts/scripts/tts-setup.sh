@@ -6,10 +6,10 @@ set -euo pipefail
 
 PLUGIN_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CONFIG_FILE="$HOME/.claude/claude-tts.local.md"
-VALID_PROVIDERS="elevenlabs openai google amazon azure edge kitten mimo tada fish gemini local"
 
 # Source cross-platform abstraction layer
 source "${PLUGIN_ROOT}/hooks/scripts/platform.sh"
+source "${PLUGIN_ROOT}/hooks/scripts/providers.sh"
 
 PROVIDER="${1:-}"
 API_KEY="${2:-}"
@@ -45,17 +45,9 @@ if [[ -z "$PROVIDER" ]]; then
 fi
 
 # Validate provider
-PROVIDER_VALID=false
-for p in $VALID_PROVIDERS; do
-  if [[ "$PROVIDER" == "$p" ]]; then
-    PROVIDER_VALID=true
-    break
-  fi
-done
-
-if [[ "$PROVIDER_VALID" == false ]]; then
+if ! tts_provider_is_valid "$PROVIDER"; then
   echo "ERROR: Unknown provider '$PROVIDER'"
-  echo "Valid providers: $VALID_PROVIDERS"
+  echo "Valid providers: $TTS_PROVIDERS"
   exit 1
 fi
 
@@ -67,7 +59,7 @@ if ! command -v jq &>/dev/null; then
 fi
 
 # Require API key for cloud providers
-if [[ "$PROVIDER" != "local" && "$PROVIDER" != "amazon" && "$PROVIDER" != "edge" && "$PROVIDER" != "kitten" && "$PROVIDER" != "tada" && -z "$API_KEY" ]]; then
+if tts_provider_needs_key "$PROVIDER" && [[ -z "$API_KEY" ]]; then
   echo "ERROR: API key required for $PROVIDER"
   echo ""
   case "$PROVIDER" in
@@ -223,67 +215,37 @@ echo "Testing TTS pipeline..."
 QUEUE_DIR="${TMPDIR:-/tmp}/claude_tts_queue"
 mkdir -p "$QUEUE_DIR"
 TEST_TEXT="Claude TTS is now set up and working."
-TEST_FILE="${QUEUE_DIR}/test_setup.mp3"
+TEST_FILE="${QUEUE_DIR}/test_setup.$(tts_provider_audio_ext "$PROVIDER")"
+TEST_VOICE=$(tts_provider_default voice "$PROVIDER")
+TEST_MODEL=$(tts_provider_default model "$PROVIDER")
+TEST_REGION=$(tts_provider_default region "$PROVIDER")
+HTTP_CODE="000"
+RUN_TEST=true
 
 test_passed=false
 
+# Setup-only checks and installs before the shared provider call
 case "$PROVIDER" in
-  elevenlabs)
-    BODY=$(jq -n --arg text "$TEST_TEXT" '{text: $text, model_id: "eleven_flash_v2_5"}')
-    HTTP_CODE=$(curl -s -w "%{http_code}" -o "$TEST_FILE" --max-time 15 \
-      -X POST "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM" \
-      -H "xi-api-key: ${API_KEY}" -H "Content-Type: application/json" \
-      -d "$BODY" 2>/dev/null || echo "000")
-    ;;
-  openai)
-    BODY=$(jq -n --arg text "$TEST_TEXT" '{model: "tts-1", input: $text, voice: "alloy", response_format: "mp3"}')
-    HTTP_CODE=$(curl -s -w "%{http_code}" -o "$TEST_FILE" --max-time 15 \
-      -X POST "https://api.openai.com/v1/audio/speech" \
-      -H "Authorization: Bearer ${API_KEY}" -H "Content-Type: application/json" \
-      -d "$BODY" 2>/dev/null || echo "000")
-    ;;
-  google)
-    TMP_RESP=$(mktemp "${TMPDIR:-/tmp}/claude_tts_test.XXXXXX")
-    BODY=$(jq -n --arg text "$TEST_TEXT" '{input:{text:$text},voice:{languageCode:"en-US",name:"en-US-Neural2-F"},audioConfig:{audioEncoding:"MP3"}}')
-    HTTP_CODE=$(curl -s -w "%{http_code}" -o "$TMP_RESP" --max-time 15 \
-      -X POST "https://texttospeech.googleapis.com/v1/text:synthesize" \
-      -H "X-Goog-Api-Key: ${API_KEY}" -H "Content-Type: application/json" \
-      -d "$BODY" 2>/dev/null || echo "000")
-    if [[ "$HTTP_CODE" == "200" ]]; then
-      jq -r '.audioContent' "$TMP_RESP" 2>/dev/null | base64 -d > "$TEST_FILE" 2>/dev/null
-    fi
-    rm -f "$TMP_RESP"
-    ;;
   amazon)
-    if command -v aws &>/dev/null; then
-      aws polly synthesize-speech --output-format mp3 --voice-id Joanna --engine neural \
-        --text "$TEST_TEXT" "$TEST_FILE" &>/dev/null && HTTP_CODE="200" || HTTP_CODE="000"
-    else
+    if ! command -v aws &>/dev/null; then
       echo "AWS CLI not found. Install with: $(install_hint awscli)"
-      HTTP_CODE="000"
+      RUN_TEST=false
     fi
     ;;
   azure)
-    SSML="<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'><voice name='en-US-JennyNeural'>${TEST_TEXT}</voice></speak>"
-    REGION_VAL=$(grep '^region:' "$CONFIG_FILE" 2>/dev/null | head -1 | sed -E 's/^region:[[:space:]]*"?([^"]*)"?/\1/')
-    [[ -z "$REGION_VAL" ]] && REGION_VAL="eastus"
-    HTTP_CODE=$(curl -s -w "%{http_code}" -o "$TEST_FILE" --max-time 15 \
-      -X POST "https://${REGION_VAL}.tts.speech.microsoft.com/cognitiveservices/v1" \
-      -H "Ocp-Apim-Subscription-Key: ${API_KEY}" \
-      -H "Content-Type: application/ssml+xml" \
-      -H "X-Microsoft-OutputFormat: audio-16khz-128kbitrate-mono-mp3" \
-      -d "$SSML" 2>/dev/null || echo "000")
+    # Kept from the previous test block to preserve behavior: the config
+    # written above has no region: line, so grep exits 1 and
+    # set -euo pipefail stops setup here with status 1.
+    TEST_REGION=$(grep '^region:' "$CONFIG_FILE" 2>/dev/null | head -1 | sed -E 's/^region:[[:space:]]*"?([^"]*)"?/\1/')
+    TEST_REGION="${TEST_REGION:-eastus}"
     ;;
   edge)
-    if command -v edge-tts &>/dev/null; then
-      edge-tts --voice "en-US-AriaNeural" --text "$TEST_TEXT" --write-media "$TEST_FILE" &>/dev/null && HTTP_CODE="200" || HTTP_CODE="000"
-    else
+    if ! command -v edge-tts &>/dev/null; then
       echo "edge-tts not found. Install with: pip install edge-tts"
-      HTTP_CODE="000"
+      RUN_TEST=false
     fi
     ;;
   kitten)
-    TEST_FILE="${QUEUE_DIR}/test_setup.wav"
     # Auto-install espeak system dependency if missing
     if ! command -v espeak &>/dev/null && ! command -v espeak-ng &>/dev/null; then
       echo "Installing espeak (required by Kitten TTS)..."
@@ -306,142 +268,26 @@ case "$PROVIDER" in
       echo "Installing KittenTTS and soundfile..."
       pip install KittenTTS soundfile 2>&1 | tail -1
     fi
-    if python3 -c "import kittentts" &>/dev/null; then
-      KITTEN_TEXT="$TEST_TEXT" KITTEN_OUTPUT="$TEST_FILE" \
-        python3 -c "
-import os, soundfile as sf
-from kittentts import KittenTTS
-model = KittenTTS()
-audio = model.generate(text=os.environ['KITTEN_TEXT'], voice='expr-voice-2-f', speed=1.0)
-sf.write(os.environ['KITTEN_OUTPUT'], audio, 24000)
-" &>/dev/null && HTTP_CODE="200" || HTTP_CODE="000"
-    else
+    if ! python3 -c "import kittentts" &>/dev/null; then
       echo "ERROR: Failed to install KittenTTS. Try manually: pip install KittenTTS soundfile"
-      HTTP_CODE="000"
+      RUN_TEST=false
     fi
-    ;;
-  mimo)
-    TEST_FILE="${QUEUE_DIR}/test_setup.wav"
-    TMP_RESP=$(mktemp "${TMPDIR:-/tmp}/claude_tts_mimo_test.XXXXXX")
-    BODY=$(jq -n --arg text "$TEST_TEXT" '{
-      model: "mimo-v2-tts",
-      messages: [{ role: "assistant", content: $text }],
-      audio: { format: "wav", voice: "mimo_default" }
-    }')
-    HTTP_CODE=$(curl -s -w "%{http_code}" -o "$TMP_RESP" --max-time 15 \
-      -X POST "https://api.xiaomimimo.com/v1/chat/completions" \
-      -H "api-key: ${API_KEY}" -H "Content-Type: application/json" \
-      -d "$BODY" 2>/dev/null || echo "000")
-    if [[ "$HTTP_CODE" == "200" ]]; then
-      jq -r '.choices[0].message.audio.data' "$TMP_RESP" 2>/dev/null | base64 -d > "$TEST_FILE" 2>/dev/null
-    fi
-    rm -f "$TMP_RESP"
-    ;;
-  fish)
-    BODY=$(jq -n --arg text "$TEST_TEXT" '{text: $text, format: "mp3"}')
-    HTTP_CODE=$(curl -s -w "%{http_code}" -o "$TEST_FILE" --max-time 15 \
-      -X POST "https://api.fish.audio/v1/tts" \
-      -H "Authorization: Bearer ${API_KEY}" \
-      -H "Content-Type: application/json" \
-      -H "model: s2-pro" \
-      -d "$BODY" 2>/dev/null || echo "000")
-    ;;
-  gemini)
-    TEST_FILE="${QUEUE_DIR}/test_setup.wav"
-    TMP_RESP=$(mktemp "${TMPDIR:-/tmp}/claude_tts_gemini_test.XXXXXX")
-    BODY=$(jq -n --arg text "$TEST_TEXT" '{
-      contents: [{ parts: [{ text: $text }] }],
-      generationConfig: {
-        responseModalities: ["AUDIO"],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: "Kore" }
-          }
-        }
-      }
-    }')
-    HTTP_CODE=$(curl -s -w "%{http_code}" -o "$TMP_RESP" --max-time 15 \
-      -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent" \
-      -H "x-goog-api-key: ${API_KEY}" -H "Content-Type: application/json" \
-      -d "$BODY" 2>/dev/null || echo "000")
-    if [[ "$HTTP_CODE" == "200" ]]; then
-      PCM_TMP=$(mktemp "${TMPDIR:-/tmp}/claude_tts_pcm_test.XXXXXX")
-      jq -r '.candidates[0].content.parts[0].inlineData.data' "$TMP_RESP" 2>/dev/null | base64 -d > "$PCM_TMP" 2>/dev/null
-      python3 -c "
-import struct, sys
-pcm = open(sys.argv[1], 'rb').read()
-with open(sys.argv[2], 'wb') as f:
-    f.write(b'RIFF')
-    f.write(struct.pack('<I', len(pcm) + 36))
-    f.write(b'WAVEfmt ')
-    f.write(struct.pack('<IHHIIHH', 16, 1, 1, 24000, 48000, 2, 16))
-    f.write(b'data')
-    f.write(struct.pack('<I', len(pcm)))
-    f.write(pcm)
-" "$PCM_TMP" "$TEST_FILE" 2>/dev/null
-      rm -f "$PCM_TMP"
-    fi
-    rm -f "$TMP_RESP"
     ;;
   tada)
-    TEST_FILE="${QUEUE_DIR}/test_setup.wav"
     # Auto-install hume-tada if missing
     if ! python3 -c "import tada" &>/dev/null; then
       echo "Installing hume-tada (this may take a while, includes PyTorch)..."
       pip install hume-tada 2>&1 | tail -3
     fi
-    if python3 -c "import tada" &>/dev/null; then
-      tada_ref="${API_KEY:-$HOME/.claude/tada-reference.wav}"
-      tada_cache="$HOME/.claude/tada-prompt-cache.pt"
-      if [[ -f "$tada_ref" ]]; then
-        echo "Loading model and generating test audio (first run downloads ~2-4 GB)..."
-        TADA_TEXT="$TEST_TEXT" TADA_OUTPUT="$TEST_FILE" TADA_MODEL="tada-1b" \
-          TADA_REF_AUDIO="$tada_ref" TADA_CACHE="$tada_cache" \
-          python3 -c "
-import os, sys, torch, torchaudio
-from tada.modules.encoder import EncoderOutput
-from tada.modules.tada import TadaForCausalLM
-text = os.environ['TADA_TEXT']
-output_path = os.environ['TADA_OUTPUT']
-model_name = 'HumeAI/' + os.environ.get('TADA_MODEL', 'tada-1b')
-ref_audio_path = os.environ.get('TADA_REF_AUDIO', '')
-cache_path = os.environ.get('TADA_CACHE', '')
-if torch.cuda.is_available():
-    device, dtype = 'cuda', torch.bfloat16
-elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-    device, dtype = 'mps', torch.float32
-else:
-    device, dtype = 'cpu', torch.float32
-if cache_path and os.path.exists(cache_path):
-    prompt = EncoderOutput.load(cache_path, device=device)
-else:
-    from tada.modules.encoder import Encoder
-    if not ref_audio_path or not os.path.exists(ref_audio_path):
-        sys.exit(1)
-    encoder = Encoder.from_pretrained('HumeAI/tada-codec', subfolder='encoder').to(device)
-    audio, sr = torchaudio.load(ref_audio_path)
-    audio = audio.to(device)
-    prompt = encoder(audio, sample_rate=sr)
-    if cache_path:
-        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-        prompt.save(cache_path)
-    del encoder
-model = TadaForCausalLM.from_pretrained(model_name, torch_dtype=dtype).to(device)
-if hasattr(model, 'decoder'):
-    model.decoder.to(device)
-output = model.generate(prompt=prompt, text=text)
-wav = output.audio[0].detach().cpu().float()
-if wav.dim() == 1:
-    wav = wav.unsqueeze(0)
-torchaudio.save(output_path, wav, 24000)
-" && HTTP_CODE="200" || HTTP_CODE="000"
-      else
-        echo "ERROR: Reference audio not found at: $tada_ref"
-        HTTP_CODE="000"
-      fi
-    else
+    if ! python3 -c "import tada" &>/dev/null; then
       echo "ERROR: Failed to install hume-tada. Try manually: pip install hume-tada"
-      HTTP_CODE="000"
+      RUN_TEST=false
+    elif [[ ! -f "$ref_audio" ]]; then
+      echo "ERROR: Reference audio not found at: $ref_audio"
+      RUN_TEST=false
+    else
+      echo "Loading model and generating test audio (first run downloads ~2-4 GB)..."
+      TEST_VOICE="$ref_audio"
     fi
     ;;
   local)
@@ -461,6 +307,15 @@ torchaudio.save(output_path, wav, 24000)
     fi
     ;;
 esac
+
+if [[ "$RUN_TEST" == true ]]; then
+  # shellcheck disable=SC2034
+  TTS_CURL_MAX_TIME=15
+  # shellcheck disable=SC2034
+  TTS_SYNTH_VERBOSE=1
+  tts_synth "$PROVIDER" "$TEST_FILE" "$TEST_TEXT" "$TEST_VOICE" "$TEST_MODEL" "$TEST_REGION" "$API_KEY" || true
+  HTTP_CODE="$TTS_HTTP_CODE"
+fi
 
 if [[ "$HTTP_CODE" == "200" && -f "$TEST_FILE" ]]; then
   FILE_SIZE=$(file_size "$TEST_FILE")
