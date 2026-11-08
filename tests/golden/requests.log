@@ -1245,12 +1245,13 @@ Voices: expr-voice-2-m, expr-voice-2-f, expr-voice-3-m, expr-voice-3-f, expr-voi
 import os, soundfile as sf
 from kittentts import KittenTTS
 model = KittenTTS()
-audio = model.generate(text=os.environ['KITTEN_TEXT'], voice='expr-voice-2-f', speed=1.0)
+audio = model.generate(text=os.environ['KITTEN_TEXT'], voice=os.environ['KITTEN_VOICE'], speed=1.0)
 sf.write(os.environ['KITTEN_OUTPUT'], audio, 24000)
 
 --- env
 KITTEN_OUTPUT=<T>/tmp/claude_tts_queue/test_setup.wav
 KITTEN_TEXT=Claude TTS is now set up and working.
+KITTEN_VOICE=expr-voice-2-f
 === mpv
 [--no-terminal]
 [<T>/tmp/claude_tts_queue/test_setup.wav]
@@ -1348,17 +1349,20 @@ GPU recommended (CUDA or Apple MPS). CPU works but is slow.
 import os, sys, torch, torchaudio
 from tada.modules.encoder import EncoderOutput
 from tada.modules.tada import TadaForCausalLM
+
 text = os.environ['TADA_TEXT']
 output_path = os.environ['TADA_OUTPUT']
 model_name = 'HumeAI/' + os.environ.get('TADA_MODEL', 'tada-1b')
 ref_audio_path = os.environ.get('TADA_REF_AUDIO', '')
 cache_path = os.environ.get('TADA_CACHE', '')
+
 if torch.cuda.is_available():
     device, dtype = 'cuda', torch.bfloat16
 elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
     device, dtype = 'mps', torch.float32
 else:
     device, dtype = 'cpu', torch.float32
+
 if cache_path and os.path.exists(cache_path):
     prompt = EncoderOutput.load(cache_path, device=device)
 else:
@@ -1373,6 +1377,7 @@ else:
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
         prompt.save(cache_path)
     del encoder
+
 model = TadaForCausalLM.from_pretrained(model_name, torch_dtype=dtype).to(device)
 if hasattr(model, 'decoder'):
     model.decoder.to(device)
