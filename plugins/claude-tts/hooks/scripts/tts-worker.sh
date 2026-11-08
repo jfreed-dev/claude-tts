@@ -16,6 +16,12 @@ if [[ -z "$TEMP_FILE" || ! -f "$TEMP_FILE" ]]; then
   exit 1
 fi
 
+# Register this worker so tts-stop.sh can find and kill it
+mkdir -p "$TTS_QUEUE_DIR"
+WORKER_PID_FILE=$(tts_worker_pid_file $$)
+echo "$$" > "$WORKER_PID_FILE"
+trap 'rm -f "$WORKER_PID_FILE"' EXIT
+
 RAW_TEXT=$(cat "$TEMP_FILE")
 rm -f "$TEMP_FILE"
 

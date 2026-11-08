@@ -89,3 +89,10 @@ status_env-claude-key
 status_env-elevenlabs-key-openai
 status_stale-pid
 status_azure-config
+stop_daemon-playing
+stop_daemon-sigkilled
+stop_worker-curl-in-flight
+stop_worker-local-tts-in-flight
+stop_nothing-running
+stop_tts-stop-command
+stop_tts-off-command

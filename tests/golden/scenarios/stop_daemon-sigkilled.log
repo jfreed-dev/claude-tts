@@ -1,0 +1,17 @@
+##### stop: daemon-sigkilled
+decoy comm: mpv
+daemon: dead
+--- exit: 0
+stop within 3s: yes
+mpv: dead
+mpv child: dead
+decoy: alive
+decoy child: alive
+hook lock: gone
+--- stdout
+--- stderr
+--- queue
+--- stub log
+=== mpv
+[--no-terminal]
+[<T>/tmp/claude_tts_queue/000001.mp3]

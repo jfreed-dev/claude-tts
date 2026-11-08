@@ -72,3 +72,59 @@ tts_load_config() {
   fi
   return 0
 }
+
+# --- Process tracking for tts-stop.sh ---
+# The daemon records its play subshell in TTS_PLAYER_PID_FILE, and each
+# worker records itself in tts_worker_pid_file. Stop kills only these.
+
+TTS_PLAYER_PID_FILE="${TTS_QUEUE_DIR}/player.pid"
+
+# tts_worker_pid_file PID: print the pid file path for the worker PID.
+tts_worker_pid_file() {
+  printf '%s' "${TTS_QUEUE_DIR}/worker.${1}.pid"
+}
+
+# tts_read_pid FILE: print the PID if FILE holds a positive integer, else return 1.
+tts_read_pid() {
+  local p
+  p=$(cat "$1" 2>/dev/null) || return 1
+  case "$p" in
+    ''|0*|*[!0-9]*) return 1 ;;
+  esac
+  printf '%s' "$p"
+}
+
+# tts_pid_matches PID PATTERN: 0 if PID is alive and its command line contains PATTERN.
+# No pipeline: grep -q under pipefail gives false negatives through SIGPIPE.
+tts_pid_matches() {
+  local cmd
+  cmd=$(ps -p "$1" -o command= 2>/dev/null) || return 1
+  [[ "$cmd" == *"$2"* ]]
+}
+
+# tts_kill_tree PID: SIGSTOP PID so it cannot fork, kill its descendants
+# depth-first, then SIGTERM and SIGCONT PID. Never signals $$. Returns 0.
+tts_kill_tree() {
+  local pid="$1" c kids
+  if [[ "$pid" == "$$" ]]; then
+    return 0
+  fi
+  kill -STOP "$pid" 2>/dev/null || return 0
+  kids=$(pgrep -P "$pid" 2>/dev/null) || true
+  for c in $kids; do
+    tts_kill_tree "$c"
+  done
+  kill -TERM "$pid" 2>/dev/null
+  kill -CONT "$pid" 2>/dev/null
+  return 0
+}
+
+# tts_kill_children PID: tts_kill_tree on each direct child of PID. Returns 0.
+tts_kill_children() {
+  local c kids
+  kids=$(pgrep -P "$1" 2>/dev/null) || true
+  for c in $kids; do
+    tts_kill_tree "$c"
+  done
+  return 0
+}

@@ -19,14 +19,23 @@ fi
 echo $$ > "$TTS_DAEMON_PID_FILE"
 
 cleanup() {
-  # Kill all child processes (audio players like afplay, mpv, etc.)
-  pkill -P $$ 2>/dev/null || true
-  rm -f "$TTS_DAEMON_PID_FILE"
-  rm -rf "$TTS_DAEMON_LOCK"
-  # Clear remaining queued audio files (use find to avoid zsh glob issues)
-  find "${TTS_QUEUE_DIR}" -maxdepth 1 -type f \( -name "*.mp3" -o -name "*.wav" \) -delete 2>/dev/null || true
+  # Kill the whole subtree: the play subshell and the audio player under it
+  tts_kill_children $$
+  rm -f "$TTS_PLAYER_PID_FILE"
+  # Remove the pid file, lock and queued audio only while the pid file still
+  # names this daemon, so a late cleanup cannot undo a newer daemon's state
+  if [[ "$(tts_read_pid "$TTS_DAEMON_PID_FILE")" == "$$" ]]; then
+    rm -f "$TTS_DAEMON_PID_FILE"
+    rm -rf "$TTS_DAEMON_LOCK"
+    # Clear remaining queued audio files (use find to avoid zsh glob issues)
+    find "${TTS_QUEUE_DIR}" -maxdepth 1 -type f \( -name "*.mp3" -o -name "*.wav" \) -delete 2>/dev/null || true
+  fi
 }
-trap cleanup EXIT TERM INT
+# A TERM or INT trap without exit would resume the loop, so exit explicitly;
+# the EXIT trap then runs cleanup.
+trap cleanup EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 
 IDLE=0
 
@@ -38,7 +47,10 @@ while true; do
     IDLE=0
     # Play audio in background so signals can interrupt it
     play_audio "$NEXT" 2>/dev/null &
-    wait $! 2>/dev/null || true
+    PLAY_PID=$!
+    echo "$PLAY_PID" > "$TTS_PLAYER_PID_FILE"
+    wait "$PLAY_PID" 2>/dev/null || true
+    rm -f "$TTS_PLAYER_PID_FILE"
     # Remove after playing
     rm -f "$NEXT"
   else

@@ -110,6 +110,8 @@ Audio stops automatically in several ways:
 - **Submit a new prompt** — any currently playing audio stops immediately
 - **Run `/claude-tts:tts-stop`** — stop audio on demand without disabling TTS
 
+Stopping affects only audio and synthesis the plugin started; other audio players and `say` processes on the system keep running.
+
 ### Commands
 
 | Command | Description |
@@ -178,7 +180,7 @@ The hooks exit immediately so Claude Code is never blocked.
 - The plugin falls back to local TTS automatically on API errors
 
 **Audio queue stuck**
-- Run `/claude-tts:tts-stop` to kill the daemon and clear the queue
+- Run `/claude-tts:tts-stop` to kill the daemon, cancel in-flight synthesis and clear the queue
 - Or manually: `kill $(cat ${TMPDIR}/claude_tts_queue/daemon.pid) && rm -f ${TMPDIR}/claude_tts_queue/*.mp3 ${TMPDIR}/claude_tts_queue/*.wav`
 
 **Linux: No audio player**
