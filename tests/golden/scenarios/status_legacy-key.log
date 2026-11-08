@@ -5,7 +5,7 @@
 
 TTS:      DISABLED
 Provider: elevenlabs (legacy config)
-API Key:  Set (config file)
+API Key:  Set (config file, legacy)
 jq:       Installed (<JQ>)
 Platform: Linux
 Daemon:   Not running (starts automatically)

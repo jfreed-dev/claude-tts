@@ -4,8 +4,8 @@
 === Claude TTS Status ===
 
 TTS:      DISABLED
-Provider: elevenlabs (legacy config)
-API Key:  Set (config file)
+Provider: (not configured)
+API Key:  NOT SET
 jq:       Installed (<JQ>)
 Platform: Linux
 Daemon:   Not running (starts automatically)
