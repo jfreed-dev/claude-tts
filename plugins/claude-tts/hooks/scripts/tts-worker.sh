@@ -20,7 +20,8 @@ fi
 mkdir -p "$TTS_QUEUE_DIR"
 WORKER_PID_FILE=$(tts_worker_pid_file $$)
 echo "$$" > "$WORKER_PID_FILE"
-trap 'rm -f "$WORKER_PID_FILE"' EXIT
+# Also remove the message file, in case stop kills the worker before it reads it
+trap 'rm -f "$WORKER_PID_FILE" "$TEMP_FILE"' EXIT
 
 RAW_TEXT=$(cat "$TEMP_FILE")
 rm -f "$TEMP_FILE"
