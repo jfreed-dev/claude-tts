@@ -12,6 +12,7 @@ Text-to-speech plugin for Claude Code. Automatically speaks Claude's responses a
 | **Amazon Polly** | Good | Paid (free tier available) | AWS CLI configured |
 | **Edge TTS** | Very good | Free | `pip install edge-tts` |
 | **Kitten TTS** | Good | Free | `pip install KittenTTS soundfile` + `espeak` |
+| **Hume TADA** | Very good | Free | `pip install hume-tada` (GPU recommended) |
 | **Fish Audio** | Excellent | Paid (billing required) | API key |
 | **Gemini TTS** | Excellent | Paid (free tier available) | API key |
 | **MiMo TTS** | Excellent | Free (limited time) | API key |

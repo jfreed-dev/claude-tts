@@ -83,14 +83,14 @@ tts_provider_summary() {
     elevenlabs) printf '%s' "ElevenLabs TTS (high quality)" ;;
     openai)     printf '%s' "OpenAI TTS" ;;
     google)     printf '%s' "Google Cloud Text-to-Speech" ;;
-    amazon)     printf '%s' "Amazon Polly (uses AWS CLI creds)" ;;
+    amazon)     printf '%s' "Amazon Polly (uses AWS CLI creds, no key needed)" ;;
     edge)       printf '%s' "Microsoft Edge TTS (free, no key needed)" ;;
     kitten)     printf '%s' "Kitten TTS V0.8 (free, local, no key needed)" ;;
     mimo)       printf '%s' "Xiaomi MiMo-V2-TTS (expressive, free limited time)" ;;
     tada)       printf '%s' "Hume TADA (open-source, GPU recommended, optional voice cloning)" ;;
     fish)       printf '%s' "Fish Audio TTS (high quality, multilingual, voice cloning)" ;;
     gemini)     printf '%s' "Google Gemini 3.1 Flash TTS (70+ languages, multi-speaker)" ;;
-    local)      printf '%s' "System built-in TTS (free, no key needed)" ;;
+    local)      printf '%s' "System built-in TTS (macOS say / espeak / Windows SAPI)" ;;
   esac
   return 0
 }
