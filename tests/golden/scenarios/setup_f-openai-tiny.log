@@ -18,6 +18,8 @@ Setup complete (with warnings). Check your API key if openai didn't work.
 ---
 provider: "openai"
 api_key: "KEY-openai"
+voice_id: "alloy"
+model_id: "tts-1"
 ---
 
 Claude TTS configuration. Provider: openai.
