@@ -13,6 +13,8 @@ setup() {
   PLUGIN_JSON="plugins/claude-tts/.claude-plugin/plugin.json"
   MARKETPLACE_JSON=".claude-plugin/marketplace.json"
   PROVIDERS=$(bash -c 'source "$0"; printf %s "$TTS_PROVIDERS"' "$PROVIDERS_SH")
+  # Without this, a broken PROVIDERS_SH lets the per-provider loops pass with nothing checked.
+  [ -n "$PROVIDERS" ] || { echo "no TTS_PROVIDERS from $PROVIDERS_SH"; return 1; }
 }
 
 # reg FUNCTION ARGS...: run a providers.sh function in a fresh bash.
