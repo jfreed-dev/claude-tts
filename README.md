@@ -10,7 +10,6 @@ Text-to-speech plugin for Claude Code. Automatically speaks Claude's responses a
 | **OpenAI** | Very good | Paid | API key |
 | **Google Cloud** | Very good | Paid (free tier available) | API key |
 | **Amazon Polly** | Good | Paid (free tier available) | AWS CLI configured |
-| **Azure Speech** | Very good | Paid (free tier available) | API key + region |
 | **Edge TTS** | Very good | Free | `pip install edge-tts` |
 | **Kitten TTS** | Good | Free | `pip install KittenTTS soundfile` + `espeak` |
 | **Fish Audio** | Excellent | Paid (billing required) | API key |
@@ -56,7 +55,6 @@ Restart Claude Code after installing.
 /claude-tts:tts-setup openai sk-abc123
 /claude-tts:tts-setup google AIza...
 /claude-tts:tts-setup amazon
-/claude-tts:tts-setup azure your-key-here
 /claude-tts:tts-setup edge
 /claude-tts:tts-setup kitten
 /claude-tts:tts-setup mimo your-key-here
@@ -74,7 +72,6 @@ Restart Claude Code after installing.
 | openai | `alloy` | `tts-1` | `Bearer` token |
 | google | `en-US-Neural2-F` | n/a | `X-Goog-Api-Key` header |
 | amazon | `Joanna` | `neural` | AWS CLI env creds |
-| azure | `en-US-JennyNeural` | n/a | `Ocp-Apim-Subscription-Key` header |
 | edge | `en-US-AriaNeural` | n/a | none (free) |
 | kitten | `expr-voice-2-f` | n/a | none (free, local) |
 | mimo | `mimo_default` | `mimo-v2-tts` | `api-key` header |
@@ -113,6 +110,8 @@ Audio stops automatically in several ways:
 - **Submit a new prompt** — any currently playing audio stops immediately
 - **Run `/claude-tts:tts-stop`** — stop audio on demand without disabling TTS
 
+Stopping affects only audio and synthesis the plugin started; other audio players and `say` processes on the system keep running.
+
 ### Commands
 
 | Command | Description |
@@ -138,16 +137,6 @@ model_id: "eleven_flash_v2_5"
 
 Only `provider` is required. Each provider has sensible defaults for `voice_id` and `model_id`.
 
-For Azure, add `region`:
-
-```yaml
----
-provider: "azure"
-api_key: "your-key"
-region: "eastus"
----
-```
-
 ### Environment variables
 
 - `CLAUDE_TTS_API_KEY` — generic, works with any provider
@@ -160,6 +149,10 @@ If your config has `elevenlabs_api_key:` but no `provider:`, it will automatical
 ### Migration from v2 (say → local)
 
 If your config has `provider: "say"`, it will automatically be mapped to `local`. No action needed.
+
+### Azure removed in 3.0.0
+
+Azure was removed in 3.0.0. A config with `provider: "azure"` falls back to local system TTS. Run `/claude-tts:tts-setup` with another provider.
 
 ## How it works
 
@@ -187,7 +180,7 @@ The hooks exit immediately so Claude Code is never blocked.
 - The plugin falls back to local TTS automatically on API errors
 
 **Audio queue stuck**
-- Run `/claude-tts:tts-stop` to kill the daemon and clear the queue
+- Run `/claude-tts:tts-stop` to kill the daemon, cancel in-flight synthesis and clear the queue
 - Or manually: `kill $(cat ${TMPDIR}/claude_tts_queue/daemon.pid) && rm -f ${TMPDIR}/claude_tts_queue/*.mp3 ${TMPDIR}/claude_tts_queue/*.wav`
 
 **Linux: No audio player**

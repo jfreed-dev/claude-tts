@@ -1,0 +1,13 @@
+##### status: env-elevenlabs-key-openai
+--- exit: 0
+--- stdout
+=== Claude TTS Status ===
+
+TTS:      DISABLED
+Provider: openai
+API Key:  Set (ELEVENLABS_API_KEY env var)
+jq:       Installed (<JQ>)
+Platform: Linux
+Daemon:   Not running (starts automatically)
+Queued:   0 audio file(s)
+--- stderr

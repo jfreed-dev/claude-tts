@@ -1,0 +1,29 @@
+##### worker: a-defaults-elevenlabs
+--- exit: 0
+--- stdout
+--- stderr
+--- queue
+.seq
+000001.mp3
+daemon.pid
+--- stub log
+=== curl
+[-s]
+[-w]
+[%{http_code}]
+[-o]
+[<T>/tmp/claude_tts_queue/000001.mp3]
+[--max-time]
+[30]
+[-X]
+[POST]
+[https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM]
+[-H]
+[xi-api-key: KEY-elevenlabs]
+[-H]
+[Content-Type: application/json]
+[-d]
+[{
+  "text": "Build summary Here is bold and italic text with and a [docs link]( First item done Second item done Numbered step one Details at for later.",
+  "model_id": "eleven_flash_v2_5"
+}]

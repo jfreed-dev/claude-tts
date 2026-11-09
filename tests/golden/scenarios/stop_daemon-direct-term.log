@@ -1,0 +1,13 @@
+##### stop: daemon-direct-term
+decoy comm: mpv
+daemon: dead
+mpv: dead
+mpv child: dead
+decoy: alive
+decoy child: alive
+--- daemon output
+--- queue
+--- stub log
+=== mpv
+[--no-terminal]
+[<T>/tmp/claude_tts_queue/000001.mp3]

@@ -1,0 +1,57 @@
+##### setup: provider-mimo
+--- exit: 0
+--- stdout
+Config written to: <T>/home/.claude/claude-tts.local.md
+TTS enabled with provider: mimo
+
+Testing TTS pipeline...
+mimo API: OK (2048 bytes)
+Playing test audio...
+
+Setup complete! TTS is ready.
+--- stderr
+--- queue
+--- config
+---
+provider: "mimo"
+api_key: "KEY-mimo"
+voice_id: "mimo_default"
+model_id: "mimo-v2-tts"
+---
+
+Claude TTS configuration. Provider: Xiaomi MiMo-V2-TTS.
+Voices: mimo_default, default_zh (Chinese female), default_en (English female)
+Style: prefix text with <style>Happy</style> etc. for expressive speech.
+--- stub log
+=== curl
+[-s]
+[-w]
+[%{http_code}]
+[-o]
+[<MKTEMP>]
+[--max-time]
+[15]
+[-X]
+[POST]
+[https://api.xiaomimimo.com/v1/chat/completions]
+[-H]
+[api-key: KEY-mimo]
+[-H]
+[Content-Type: application/json]
+[-d]
+[{
+  "model": "mimo-v2-tts",
+  "messages": [
+    {
+      "role": "assistant",
+      "content": "Claude TTS is now set up and working."
+    }
+  ],
+  "audio": {
+    "format": "wav",
+    "voice": "mimo_default"
+  }
+}]
+=== mpv
+[--no-terminal]
+[<T>/tmp/claude_tts_queue/test_setup.wav]

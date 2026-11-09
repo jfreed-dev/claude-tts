@@ -1,0 +1,38 @@
+##### worker: b-overrides-mimo
+--- exit: 0
+--- stdout
+--- stderr
+--- queue
+.seq
+000001.wav
+daemon.pid
+--- stub log
+=== curl
+[-s]
+[-w]
+[%{http_code}]
+[-o]
+[<MKTEMP>]
+[--max-time]
+[30]
+[-X]
+[POST]
+[https://api.xiaomimimo.com/v1/chat/completions]
+[-H]
+[api-key: KEY-mimo]
+[-H]
+[Content-Type: application/json]
+[-d]
+[{
+  "model": "M-x",
+  "messages": [
+    {
+      "role": "assistant",
+      "content": "Build summary Here is bold and italic text with and a [docs link]( First item done Second item done Numbered step one Details at for later."
+    }
+  ],
+  "audio": {
+    "format": "wav",
+    "voice": "V-x"
+  }
+}]

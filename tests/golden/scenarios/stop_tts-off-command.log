@@ -1,0 +1,8 @@
+##### stop: tts-off-command
+--- exit: 0
+enabled flag: removed
+--- stdout
+TTS disabled. Claude responses will no longer be spoken.
+--- stderr
+--- queue
+--- stub log

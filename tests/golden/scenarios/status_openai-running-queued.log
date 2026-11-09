@@ -1,0 +1,13 @@
+##### status: openai-running-queued
+--- exit: 0
+--- stdout
+=== Claude TTS Status ===
+
+TTS:      ENABLED
+Provider: openai
+API Key:  Set (config file)
+jq:       Installed (<JQ>)
+Platform: Linux
+Daemon:   Running (PID <PID>)
+Queued:   2 audio file(s)
+--- stderr

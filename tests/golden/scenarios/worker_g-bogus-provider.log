@@ -1,0 +1,13 @@
+##### worker: g-bogus-provider
+--- exit: 0
+--- stdout
+--- stderr
+--- queue
+.seq
+000001.wav
+daemon.pid
+--- stub log
+=== espeak-ng
+[-w]
+[<T>/tmp/claude_tts_queue/000001.wav]
+[Build summary Here is bold and italic text with and a [docs link]( First item done Second item done Numbered step one Details at for later.]

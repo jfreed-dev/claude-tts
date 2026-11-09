@@ -1,0 +1,17 @@
+##### stop: worker-local-tts-in-flight
+decoy comm: mpv
+--- exit: 0
+stop within 3s: yes
+worker: dead
+espeak-ng: dead
+espeak-ng child: dead
+decoy: alive
+decoy child: alive
+--- stdout
+--- stderr
+--- queue
+--- stub log
+=== espeak-ng
+[-w]
+[<T>/tmp/claude_tts_queue/000001.wav]
+[Build summary Here is bold and italic text with and a [docs link]( First item done Second item done Numbered step one Details at for later.]

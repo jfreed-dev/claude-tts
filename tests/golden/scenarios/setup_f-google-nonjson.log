@@ -1,0 +1,55 @@
+##### setup: f-google-nonjson
+--- exit: 0
+--- stdout
+Config written to: <T>/home/.claude/claude-tts.local.md
+TTS enabled with provider: google
+
+Testing TTS pipeline...
+google API: FAILED (HTTP 200)
+Check your API key and try again.
+
+Falling back to local TTS...
+Local TTS: OK
+
+Setup complete (with warnings). Check your API key if google didn't work.
+--- stderr
+--- queue
+--- config
+---
+provider: "google"
+api_key: "KEY-google"
+---
+
+Claude TTS configuration. Provider: google.
+Edit voice_id and model_id above to customize.
+--- stub log
+=== curl
+[-s]
+[-w]
+[%{http_code}]
+[-o]
+[<MKTEMP>]
+[--max-time]
+[15]
+[-X]
+[POST]
+[https://texttospeech.googleapis.com/v1/text:synthesize]
+[-H]
+[X-Goog-Api-Key: KEY-google]
+[-H]
+[Content-Type: application/json]
+[-d]
+[{
+  "input": {
+    "text": "Claude TTS is now set up and working."
+  },
+  "voice": {
+    "languageCode": "en-US",
+    "name": "en-US-Neural2-F"
+  },
+  "audioConfig": {
+    "audioEncoding": "MP3"
+  }
+}]
+=== espeak-ng
+[Claude TTS is now set up and working.]

@@ -6,7 +6,7 @@
 # Top level holds only constants and function definitions, so it is safe to
 # source under set -euo pipefail.
 
-TTS_PROVIDERS="elevenlabs openai google amazon azure edge kitten mimo tada fish gemini local"
+TTS_PROVIDERS="elevenlabs openai google amazon edge kitten mimo tada fish gemini local"
 
 # Knobs callers may reassign after sourcing.
 TTS_CURL_MAX_TIME=30
@@ -38,7 +38,7 @@ tts_provider_needs_key() {
   esac
 }
 
-# tts_provider_default FIELD PROVIDER; FIELD is voice, model or region.
+# tts_provider_default FIELD PROVIDER; FIELD is voice or model.
 # Prints the default (empty if none) and always returns 0.
 tts_provider_default() {
   case "$1:$2" in
@@ -49,8 +49,6 @@ tts_provider_default() {
     voice:google)     printf '%s' "en-US-Neural2-F" ;;
     voice:amazon)     printf '%s' "Joanna" ;;
     model:amazon)     printf '%s' "neural" ;;
-    voice:azure)      printf '%s' "en-US-JennyNeural" ;;
-    region:azure)     printf '%s' "eastus" ;;
     voice:edge)       printf '%s' "en-US-AriaNeural" ;;
     voice:kitten)     printf '%s' "expr-voice-2-f" ;;
     voice:mimo)       printf '%s' "mimo_default" ;;
@@ -67,7 +65,7 @@ tts_provider_default() {
 # Prints the audio file extension for a provider (empty if unknown).
 tts_provider_audio_ext() {
   case "$1" in
-    elevenlabs|openai|google|amazon|azure|edge|fish) printf '%s' "mp3" ;;
+    elevenlabs|openai|google|amazon|edge|fish) printf '%s' "mp3" ;;
     kitten|mimo|tada|gemini|local) printf '%s' "wav" ;;
   esac
   return 0
@@ -89,7 +87,7 @@ tts_validate_audio() {
 
 # --- Synthesis entry point ---
 
-# tts_synth PROVIDER OUTFILE TEXT VOICE MODEL REGION API_KEY
+# tts_synth PROVIDER OUTFILE TEXT VOICE MODEL API_KEY
 # Returns 0 only when OUTFILE exists and is at least 1024 bytes; on failure
 # OUTFILE is removed. Sets TTS_HTTP_CODE.
 tts_synth() {
@@ -97,7 +95,7 @@ tts_synth() {
   local provider="$1"
   shift
   case "$provider" in
-    elevenlabs|openai|google|amazon|azure|edge|kitten|mimo|tada|fish|gemini)
+    elevenlabs|openai|google|amazon|edge|kitten|mimo|tada|fish|gemini)
       "_tts_synth_${provider}" "$@"
       ;;
     *)
@@ -119,10 +117,10 @@ _tts_http_post() {
   curl -s -w "%{http_code}" -o "$out" --max-time "$TTS_CURL_MAX_TIME" -X POST "$url" "${hargs[@]}" -d "$body" 2>/dev/null || echo "000"
 }
 
-# --- Providers: each takes OUTFILE TEXT VOICE MODEL REGION API_KEY ---
+# --- Providers: each takes OUTFILE TEXT VOICE MODEL API_KEY ---
 
 _tts_synth_elevenlabs() {
-  local out="$1" text="$2" voice="$3" model="$4" key="$6"
+  local out="$1" text="$2" voice="$3" model="$4" key="$5"
   local body
   body=$(jq -n --arg text "$text" --arg model "$model" '{
     text: $text,
@@ -141,7 +139,7 @@ _tts_synth_elevenlabs() {
 }
 
 _tts_synth_openai() {
-  local out="$1" text="$2" voice="$3" model="$4" key="$6"
+  local out="$1" text="$2" voice="$3" model="$4" key="$5"
   local body
   body=$(jq -n --arg text "$text" --arg model "$model" --arg voice "$voice" '{
     model: $model,
@@ -162,7 +160,7 @@ _tts_synth_openai() {
 }
 
 _tts_synth_google() {
-  local out="$1" text="$2" voice="$3" key="$6"
+  local out="$1" text="$2" voice="$3" key="$5"
   local body
   body=$(jq -n --arg text "$text" --arg voice "$voice" '{
     input: { text: $text },
@@ -210,24 +208,6 @@ _tts_synth_amazon() {
   tts_validate_audio "$out"
 }
 
-_tts_synth_azure() {
-  local out="$1" text="$2" voice="$3" region="$5" key="$6"
-  local ssml="<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>
-  <voice name='${voice}'>${text}</voice>
-</speak>"
-
-  TTS_HTTP_CODE=$(_tts_http_post "$out" "https://${region}.tts.speech.microsoft.com/cognitiveservices/v1" "$ssml" \
-    "Ocp-Apim-Subscription-Key: ${key}" \
-    "Content-Type: application/ssml+xml" \
-    "X-Microsoft-OutputFormat: audio-16khz-128kbitrate-mono-mp3")
-
-  if [[ "$TTS_HTTP_CODE" != "200" && "$TTS_HTTP_CODE" != "201" ]]; then
-    rm -f "$out"
-    return 1
-  fi
-  tts_validate_audio "$out"
-}
-
 _tts_synth_edge() {
   local out="$1" text="$2" voice="$3"
 
@@ -269,7 +249,7 @@ sf.write(os.environ['KITTEN_OUTPUT'], audio, 24000)
 }
 
 _tts_synth_mimo() {
-  local out="$1" text="$2" voice="$3" model="$4" key="$6"
+  local out="$1" text="$2" voice="$3" model="$4" key="$5"
   local body
   body=$(jq -n --arg text "$text" --arg model "$model" --arg voice "$voice" '{
     model: $model,
@@ -370,7 +350,7 @@ torchaudio.save(output_path, wav, 24000)
 }
 
 _tts_synth_fish() {
-  local out="$1" text="$2" voice="$3" model="$4" key="$6"
+  local out="$1" text="$2" voice="$3" model="$4" key="$5"
   local body
   if [[ -n "$voice" ]]; then
     body=$(jq -n --arg text "$text" --arg ref "$voice" '{
@@ -398,7 +378,7 @@ _tts_synth_fish() {
 }
 
 _tts_synth_gemini() {
-  local out="$1" text="$2" voice="$3" model="$4" key="$6"
+  local out="$1" text="$2" voice="$3" model="$4" key="$5"
   local body
   body=$(jq -n --arg text "$text" --arg voice "$voice" '{
     contents: [{ parts: [{ text: $text }] }],

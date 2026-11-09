@@ -1,0 +1,30 @@
+##### setup: no-args
+--- exit: 1
+--- stdout
+=== Claude TTS Setup ===
+
+Usage: tts-setup <provider> [api-key]
+
+Providers:
+  elevenlabs  — ElevenLabs TTS (high quality)
+  openai      — OpenAI TTS
+  google      — Google Cloud Text-to-Speech
+  amazon      — Amazon Polly (uses AWS CLI creds)
+  edge        — Microsoft Edge TTS (free, no key needed)
+  kitten      — Kitten TTS V0.8 (free, local, no key needed)
+  mimo        — Xiaomi MiMo-V2-TTS (expressive, free limited time)
+  tada        — Hume TADA (open-source, GPU recommended, optional voice cloning)
+  fish        — Fish Audio TTS (high quality, multilingual, voice cloning)
+  gemini      — Google Gemini 3.1 Flash TTS (70+ languages, multi-speaker)
+  local       — System built-in TTS (free, no key needed)
+
+Examples:
+  /claude-tts:tts-setup elevenlabs sk_abc123
+  /claude-tts:tts-setup openai sk-abc123
+  /claude-tts:tts-setup tada
+  /claude-tts:tts-setup local
+--- stderr
+--- queue
+--- config
+(none)
+--- stub log

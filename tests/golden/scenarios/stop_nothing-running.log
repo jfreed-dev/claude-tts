@@ -1,0 +1,8 @@
+##### stop: nothing-running
+--- exit: 0
+stop within 3s: yes
+hook lock: gone
+--- stdout
+--- stderr
+--- queue
+--- stub log

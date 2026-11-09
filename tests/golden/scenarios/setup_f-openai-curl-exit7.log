@@ -1,0 +1,49 @@
+##### setup: f-openai-curl-exit7
+--- exit: 0
+--- stdout
+Config written to: <T>/home/.claude/claude-tts.local.md
+TTS enabled with provider: openai
+
+Testing TTS pipeline...
+openai API: FAILED (HTTP 000000)
+Check your API key and try again.
+
+Falling back to local TTS...
+Local TTS: OK
+
+Setup complete (with warnings). Check your API key if openai didn't work.
+--- stderr
+--- queue
+--- config
+---
+provider: "openai"
+api_key: "KEY-openai"
+---
+
+Claude TTS configuration. Provider: openai.
+Edit voice_id and model_id above to customize.
+--- stub log
+=== curl
+[-s]
+[-w]
+[%{http_code}]
+[-o]
+[<T>/tmp/claude_tts_queue/test_setup.mp3]
+[--max-time]
+[15]
+[-X]
+[POST]
+[https://api.openai.com/v1/audio/speech]
+[-H]
+[Authorization: Bearer KEY-openai]
+[-H]
+[Content-Type: application/json]
+[-d]
+[{
+  "model": "tts-1",
+  "input": "Claude TTS is now set up and working.",
+  "voice": "alloy",
+  "response_format": "mp3"
+}]
+=== espeak-ng
+[Claude TTS is now set up and working.]

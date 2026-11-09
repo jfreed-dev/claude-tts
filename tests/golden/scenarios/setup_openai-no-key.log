@@ -1,0 +1,11 @@
+##### setup: openai-no-key
+--- exit: 1
+--- stdout
+ERROR: API key required for openai
+
+Get your key at: https://platform.openai.com/api-keys
+--- stderr
+--- queue
+--- config
+(none)
+--- stub log

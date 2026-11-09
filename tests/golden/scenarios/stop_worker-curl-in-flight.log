@@ -1,0 +1,35 @@
+##### stop: worker-curl-in-flight
+decoy comm: mpv
+--- exit: 0
+stop within 3s: yes
+worker: dead
+curl: dead
+curl child: dead
+decoy: alive
+decoy child: alive
+--- stdout
+--- stderr
+--- queue
+--- stub log
+=== curl
+[-s]
+[-w]
+[%{http_code}]
+[-o]
+[<T>/tmp/claude_tts_queue/000001.mp3]
+[--max-time]
+[30]
+[-X]
+[POST]
+[https://api.openai.com/v1/audio/speech]
+[-H]
+[Authorization: Bearer KEY-openai]
+[-H]
+[Content-Type: application/json]
+[-d]
+[{
+  "model": "tts-1",
+  "input": "Build summary Here is bold and italic text with and a [docs link]( First item done Second item done Numbered step one Details at for later.",
+  "voice": "alloy",
+  "response_format": "mp3"
+}]

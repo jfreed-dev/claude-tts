@@ -1,0 +1,21 @@
+##### worker: b-overrides-kitten
+--- exit: 0
+--- stdout
+--- stderr
+--- queue
+.seq
+000001.wav
+daemon.pid
+--- stub log
+=== python3 (kitten)
+
+import os, soundfile as sf
+from kittentts import KittenTTS
+model = KittenTTS()
+audio = model.generate(text=os.environ['KITTEN_TEXT'], voice=os.environ['KITTEN_VOICE'], speed=1.0)
+sf.write(os.environ['KITTEN_OUTPUT'], audio, 24000)
+
+--- env
+KITTEN_OUTPUT=<T>/tmp/claude_tts_queue/000001.wav
+KITTEN_TEXT=Build summary Here is bold and italic text with and a [docs link]( First item done Second item done Numbered step one Details at for later.
+KITTEN_VOICE=V-x

@@ -1,0 +1,21 @@
+##### setup: provider-local
+--- exit: 0
+--- stdout
+Config written to: <T>/home/.claude/claude-tts.local.md
+TTS enabled with provider: local
+
+Testing TTS pipeline...
+Local TTS (linux): OK
+
+Setup complete!
+--- stderr
+--- queue
+--- config
+---
+provider: "local"
+---
+
+Claude TTS configuration. Provider: local system TTS.
+--- stub log
+=== espeak-ng
+[Claude TTS is now set up and working.]

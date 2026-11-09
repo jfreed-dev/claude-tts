@@ -1,0 +1,31 @@
+##### setup: provider-edge
+--- exit: 0
+--- stdout
+Config written to: <T>/home/.claude/claude-tts.local.md
+TTS enabled with provider: edge
+
+Testing TTS pipeline...
+edge API: OK (2048 bytes)
+Playing test audio...
+
+Setup complete! TTS is ready.
+--- stderr
+--- queue
+--- config
+---
+provider: "edge"
+---
+
+Claude TTS configuration. Provider: Microsoft Edge TTS.
+Requires: pip install edge-tts
+--- stub log
+=== edge-tts
+[--voice]
+[en-US-AriaNeural]
+[--text]
+[Claude TTS is now set up and working.]
+[--write-media]
+[<T>/tmp/claude_tts_queue/test_setup.mp3]
+=== mpv
+[--no-terminal]
+[<T>/tmp/claude_tts_queue/test_setup.mp3]

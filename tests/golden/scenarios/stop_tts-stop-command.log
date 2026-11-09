@@ -1,0 +1,7 @@
+##### stop: tts-stop-command
+--- exit: 0
+--- stdout
+TTS playback stopped.
+--- stderr
+--- queue
+--- stub log

@@ -1,0 +1,32 @@
+##### worker: b-overrides-fish
+--- exit: 0
+--- stdout
+--- stderr
+--- queue
+.seq
+000001.mp3
+daemon.pid
+--- stub log
+=== curl
+[-s]
+[-w]
+[%{http_code}]
+[-o]
+[<T>/tmp/claude_tts_queue/000001.mp3]
+[--max-time]
+[30]
+[-X]
+[POST]
+[https://api.fish.audio/v1/tts]
+[-H]
+[Authorization: Bearer KEY-fish]
+[-H]
+[Content-Type: application/json]
+[-H]
+[model: M-x]
+[-d]
+[{
+  "text": "Build summary Here is bold and italic text with and a [docs link]( First item done Second item done Numbered step one Details at for later.",
+  "format": "mp3",
+  "reference_id": "V-x"
+}]

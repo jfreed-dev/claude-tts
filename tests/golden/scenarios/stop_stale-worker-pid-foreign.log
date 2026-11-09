@@ -1,0 +1,8 @@
+##### stop: stale-worker-pid-foreign
+--- exit: 0
+stop within 3s: yes
+foreign process: alive
+--- stdout
+--- stderr
+--- queue
+--- stub log
