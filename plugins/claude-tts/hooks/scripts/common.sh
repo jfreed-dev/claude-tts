@@ -7,7 +7,8 @@
 
 TTS_TMP_DIR="${TMPDIR:-/tmp}"
 TTS_QUEUE_DIR="${TTS_TMP_DIR}/claude_tts_queue"
-TTS_HOOK_LOCK="${TTS_TMP_DIR}/claude_tts_hook.lock"
+TTS_HOOK_LOCK="${TTS_TMP_DIR}/claude_tts_hook.pid"
+TTS_HOOK_BREAKER="${TTS_TMP_DIR}/claude_tts_hook.break"
 TTS_DAEMON_PID_FILE="${TTS_QUEUE_DIR}/daemon.pid"
 TTS_DAEMON_LOCK="${TTS_QUEUE_DIR}/.daemon_lock"
 TTS_SEQ_FILE="${TTS_QUEUE_DIR}/.seq"
@@ -102,13 +103,50 @@ tts_pid_matches() {
   [[ "$cmd" == *"$2"* ]]
 }
 
-# tts_hook_lock_live: 0 if the hook lock holds the PID of a running
-# tts-hook.sh. The lock is held only while a hook stops old audio and starts
-# its worker; tts-hook.sh takes it and releases it on exit.
+# --- Hook lock ---
+# TTS_HOOK_LOCK is a file holding the PID of the tts-hook.sh that owns it. A
+# hook holds it while it stops old audio and starts its worker, and releases
+# it on exit. Lock files are written to a temp file and hard-linked into
+# place: ln fails if the target exists, so a lock never exists without its
+# PID. Hard links rather than symlinks, because Git Bash on Windows copies
+# files for ln -s.
+
+# tts_hook_lock_live [FILE]: 0 if FILE (default TTS_HOOK_LOCK) holds the PID
+# of a running tts-hook.sh.
 tts_hook_lock_live() {
   local pid
-  pid=$(tts_read_pid "$TTS_HOOK_LOCK/pid") || return 1
+  pid=$(tts_read_pid "${1:-$TTS_HOOK_LOCK}") || return 1
   tts_pid_matches "$pid" tts-hook.sh
+}
+
+# tts_hook_lock_clear_stale: remove the hook lock if no running tts-hook.sh
+# owns it. Returns 0 if it removed one.
+# The removal runs under a second lock, TTS_HOOK_BREAKER, held for a few
+# milliseconds, and rechecks the hook lock there. While the breaker is held
+# the hook lock can only be created (when absent) or released by its live
+# owner, so a lock found stale under the breaker is still stale when removed.
+# Without the breaker, two hooks could both see the same stale lock and the
+# second removal could delete the lock the first had just taken.
+tts_hook_lock_clear_stale() {
+  local tmp pid removed=1
+  [[ -e "$TTS_HOOK_LOCK" ]] || return 1
+  tts_hook_lock_live && return 1
+  tmp=$(mktemp "${TTS_TMP_DIR}/claude_tts_hook.XXXXXX") || return 1
+  echo $$ > "$tmp"
+  if ln "$tmp" "$TTS_HOOK_BREAKER" 2>/dev/null; then
+    if [[ -e "$TTS_HOOK_LOCK" ]] && ! tts_hook_lock_live; then
+      rm -f "$TTS_HOOK_LOCK"
+      removed=0
+    fi
+    rm -f "$TTS_HOOK_BREAKER"
+  elif pid=$(tts_read_pid "$TTS_HOOK_BREAKER") &&
+    ! tts_pid_matches "$pid" tts-hook.sh && ! tts_pid_matches "$pid" tts-stop.sh; then
+    # The breaker's holder died inside those milliseconds. Remove the
+    # breaker so the next call can proceed.
+    rm -f "$TTS_HOOK_BREAKER"
+  fi
+  rm -f "$tmp"
+  return $removed
 }
 
 # tts_kill_tree PID: SIGSTOP PID so it cannot fork, kill its descendants

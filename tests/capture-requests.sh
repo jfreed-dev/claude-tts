@@ -434,7 +434,7 @@ stop_case() {
 }
 
 hook_lock_state() {
-  if [[ -d "${T}/tmp/claude_tts_hook.lock" ]]; then
+  if [[ -e "${T}/tmp/claude_tts_hook.pid" ]]; then
     echo "hook lock: present"
   else
     echo "hook lock: gone"
@@ -449,7 +449,7 @@ stop_daemon() {
   q="${T}/tmp/claude_tts_queue"
   : > "${q}/000001.mp3"
   : > "${q}/000002.wav"
-  mkdir "${T}/tmp/claude_tts_hook.lock"
+  echo 99999999 > "${T}/tmp/claude_tts_hook.pid"
   start_decoy
   bg_start daemon "$DAEMON" STUB_HANG=30 --
   wait_for_file "${T}/pids/mpv.pid"
@@ -693,7 +693,8 @@ api_key: \"KEY-google\"" curl
   printf '3' > "${q}/.seq"
   : > "${q}/000003.mp3"
   echo 99999999 > "${q}/daemon.pid"
-  mkdir "${q}/.daemon_lock" "${q}/.lock" "${T}/tmp/claude_tts_hook.lock"
+  mkdir "${q}/.daemon_lock" "${q}/.lock"
+  echo 99999999 > "${T}/tmp/claude_tts_hook.pid"
   run_stop
   hook_lock_state
   report false
