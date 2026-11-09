@@ -533,6 +533,20 @@ stop_worker() {
   reap_case
 }
 
+# provider_tmp_files: list the claude_tts_* temp files left in the case's
+# TMPDIR, with the mktemp suffix masked, or "(none)".
+provider_tmp_files() {
+  local list
+  echo "--- provider temp files"
+  list=$(for f in "${T}"/tmp/claude_tts_*; do [[ -f "$f" ]] && basename "$f"; done |
+    sed -E 's/\.[A-Za-z0-9]{6}$/.XXXXXX/' | sort)
+  if [[ -n "$list" ]]; then
+    printf '%s\n' "$list"
+  else
+    echo "(none)"
+  fi
+}
+
 NON_LOCAL="elevenlabs openai google amazon edge kitten mimo tada fish gemini"
 HTTP_PROVIDERS="elevenlabs openai google mimo fish gemini"
 ALL_PROVIDERS="${NON_LOCAL} local"
@@ -631,6 +645,7 @@ api_key: \"KEY-openai\"" STUB_HTTP_CODE=500 STUB_ESPEAK_EXIT=1
   setup "azure-removed" -- azure KEY-azure
   setup "openai-no-key" -- openai
   setup "say" -- say
+  setup "provider-tada-ref-path" -- tada /nonexistent/claude-tts-voice.wav
   setup "openai-http-401" STUB_HTTP_CODE=401 -- openai KEY-openai
 
   # Setup: failure modes
@@ -667,6 +682,11 @@ api_key: \"KEY-azure\""
   stop_worker "worker-curl-in-flight" "provider: \"openai\"
 api_key: \"KEY-openai\"" curl
   stop_worker "worker-local-tts-in-flight" "provider: \"local\"" espeak-ng
+  # A worker killed during google synthesis: list the provider temp files
+  # it left in TMPDIR.
+  stop_worker "worker-google-curl-in-flight" "provider: \"google\"
+api_key: \"KEY-google\"" curl
+  provider_tmp_files
 
   stop_case "nothing-running"
   q="${T}/tmp/claude_tts_queue"

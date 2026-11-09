@@ -66,6 +66,7 @@ setup_bogus-provider
 setup_azure-removed
 setup_openai-no-key
 setup_say
+setup_provider-tada-ref-path
 setup_openai-http-401
 setup_f-openai-curl-exit7
 setup_f-openai-tiny
@@ -93,6 +94,7 @@ stop_daemon-playing
 stop_daemon-sigkilled
 stop_worker-curl-in-flight
 stop_worker-local-tts-in-flight
+stop_worker-google-curl-in-flight
 stop_nothing-running
 stop_tts-stop-command
 stop_tts-off-command
