@@ -17,6 +17,11 @@ TTS_SYNTH_VERBOSE=0
 # exit status of CLI and Python providers.
 TTS_HTTP_CODE=""
 
+# Temp files of the synthesis in progress, so tts_synth_cleanup can remove
+# them if the caller is killed mid-request.
+TTS_SYNTH_TMP_RESPONSE=""
+TTS_SYNTH_TMP_PCM=""
+
 TTS_TADA_CACHE="$HOME/.claude/tada-prompt-cache.pt"
 
 # --- Provider metadata ---
@@ -199,16 +204,27 @@ tts_validate_audio() {
 # OUTFILE is removed. Sets TTS_HTTP_CODE.
 tts_synth() {
   TTS_HTTP_CODE="000"
-  local provider="$1"
+  local provider="$1" rc=0
   shift
   case "$provider" in
     elevenlabs|openai|google|amazon|edge|kitten|mimo|tada|fish|gemini)
-      "_tts_synth_${provider}" "$@"
+      "_tts_synth_${provider}" "$@" || rc=$?
       ;;
     *)
       return 1
       ;;
   esac
+  tts_synth_cleanup
+  return "$rc"
+}
+
+# Removes the temp files recorded by the synthesis in progress. Safe in an
+# EXIT trap: it always returns 0, so it never changes the exit status under
+# set -e.
+tts_synth_cleanup() {
+  if [[ -n "$TTS_SYNTH_TMP_RESPONSE" ]]; then rm -f "$TTS_SYNTH_TMP_RESPONSE"; fi
+  if [[ -n "$TTS_SYNTH_TMP_PCM" ]]; then rm -f "$TTS_SYNTH_TMP_PCM"; fi
+  TTS_SYNTH_TMP_RESPONSE=""; TTS_SYNTH_TMP_PCM=""; return 0
 }
 
 # _tts_http_post OUTFILE URL BODY HEADER... (callers pass at least two headers)
@@ -280,6 +296,7 @@ _tts_synth_google() {
 
   local tmp_response
   tmp_response=$(mktemp "${TMPDIR:-/tmp}/claude_tts_gcloud.XXXXXX")
+  TTS_SYNTH_TMP_RESPONSE="$tmp_response"
 
   TTS_HTTP_CODE=$(_tts_http_post "$tmp_response" "https://texttospeech.googleapis.com/v1/text:synthesize" "$body" \
     "X-Goog-Api-Key: ${key}" \
@@ -371,6 +388,7 @@ _tts_synth_mimo() {
 
   local tmp_response
   tmp_response=$(mktemp "${TMPDIR:-/tmp}/claude_tts_mimo.XXXXXX")
+  TTS_SYNTH_TMP_RESPONSE="$tmp_response"
 
   TTS_HTTP_CODE=$(_tts_http_post "$tmp_response" "https://api.xiaomimimo.com/v1/chat/completions" "$body" \
     "api-key: ${key}" \
@@ -501,6 +519,7 @@ _tts_synth_gemini() {
 
   local tmp_response
   tmp_response=$(mktemp "${TMPDIR:-/tmp}/claude_tts_gemini.XXXXXX")
+  TTS_SYNTH_TMP_RESPONSE="$tmp_response"
 
   TTS_HTTP_CODE=$(_tts_http_post "$tmp_response" "https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent" "$body" \
     "x-goog-api-key: ${key}" \
@@ -514,6 +533,7 @@ _tts_synth_gemini() {
   # Gemini returns base64-encoded PCM (s16le, 24kHz, mono); wrap it in WAV
   local pcm_file
   pcm_file=$(mktemp "${TMPDIR:-/tmp}/claude_tts_pcm.XXXXXX")
+  TTS_SYNTH_TMP_PCM="$pcm_file"
   jq -r '.candidates[0].content.parts[0].inlineData.data' "$tmp_response" 2>/dev/null | base64 -d > "$pcm_file" 2>/dev/null
   rm -f "$tmp_response"
 
