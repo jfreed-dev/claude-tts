@@ -1,0 +1,55 @@
+name: Tests
+
+# Runs bats tests/ on every push and pull request. No secrets.
+# The request transcript test (tests/requests.bats) starts the real queue
+# daemon and worker, but only against stubbed curl, players and package
+# managers, inside a mktemp TMPDIR and HOME:
+#   - it signals only PIDs it recorded, and its cleanup also checks
+#     TTS_CAPTURE_ROOT in /proc/PID/environ before killing anything
+#   - pkill and killall are stubs that log UNEXPECTED; tts-hook.sh never runs
+# A GitHub-hosted runner is a throwaway VM with no other user processes.
+# The first step refuses any other runner, since a self-hosted runner is a
+# persistent machine.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  bats:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check the runner
+        run: |
+          if [ "$RUNNER_OS" != Linux ] || [ "$RUNNER_ENVIRONMENT" != github-hosted ]; then
+            echo "::error::These tests start real processes; run them only on a GitHub-hosted Linux runner (got $RUNNER_OS, $RUNNER_ENVIRONMENT)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install bats and jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends bats jq
+
+      # Versions help explain a golden transcript that differs on the runner.
+      - name: Show tool versions
+        run: |
+          bash --version | head -1
+          jq --version
+          bats --version
+          python3 --version
+
+      - name: Run the tests
+        run: bats tests/
