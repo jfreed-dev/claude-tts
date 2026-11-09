@@ -118,8 +118,8 @@ tts_provider_key_url() {
 # are always written.
 tts_provider_config_fields() {
   case "$1" in
-    kitten) printf '%s' "voice" ;;
-    mimo|fish|gemini|tada) printf '%s' "voice model" ;;
+    google|kitten) printf '%s' "voice" ;;
+    elevenlabs|openai|mimo|fish|gemini|tada) printf '%s' "voice model" ;;
   esac
   return 0
 }
@@ -127,9 +127,13 @@ tts_provider_config_fields() {
 # Prints the config file lines that follow the front matter.
 tts_provider_config_notes() {
   case "$1" in
-    elevenlabs|openai|google)
+    elevenlabs|openai)
       printf 'Claude TTS configuration. Provider: %s.\n' "$1"
       printf '%s\n' 'Edit voice_id and model_id above to customize.'
+      ;;
+    google)
+      printf 'Claude TTS configuration. Provider: %s.\n' "$1"
+      printf '%s\n' 'Edit voice_id above to customize.'
       ;;
     amazon)
       printf '%s\n' \

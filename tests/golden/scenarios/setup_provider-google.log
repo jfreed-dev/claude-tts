@@ -15,10 +15,11 @@ Setup complete! TTS is ready.
 ---
 provider: "google"
 api_key: "KEY-google"
+voice_id: "en-US-Neural2-F"
 ---
 
 Claude TTS configuration. Provider: google.
-Edit voice_id and model_id above to customize.
+Edit voice_id above to customize.
 --- stub log
 === curl
 [-s]

@@ -15,6 +15,8 @@ Setup complete! TTS is ready.
 ---
 provider: "elevenlabs"
 api_key: "KEY-elevenlabs"
+voice_id: "21m00Tcm4TlvDq8ikWAM"
+model_id: "eleven_flash_v2_5"
 ---
 
 Claude TTS configuration. Provider: elevenlabs.
