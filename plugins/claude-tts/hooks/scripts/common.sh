@@ -95,11 +95,20 @@ tts_read_pid() {
   printf '%s' "$p"
 }
 
+# tts_pid_command PID: print the full command line of PID; return 1 if it is gone.
+# -ww because ps cuts the line to $COLUMNS characters when that is set, and
+# Claude Code sets it for hooks to the terminal width (93 in one capture).
+# The installed daemon's line is about 110 characters, so it loses its script
+# name, the checks below fail, and tts-stop.sh leaves the daemon running.
+tts_pid_command() {
+  ps -ww -p "$1" -o command= 2>/dev/null
+}
+
 # tts_pid_matches PID PATTERN: 0 if PID is alive and its command line contains PATTERN.
 # No pipeline: grep -q under pipefail gives false negatives through SIGPIPE.
 tts_pid_matches() {
   local cmd
-  cmd=$(ps -p "$1" -o command= 2>/dev/null) || return 1
+  cmd=$(tts_pid_command "$1") || return 1
   [[ "$cmd" == *"$2"* ]]
 }
 
@@ -116,7 +125,7 @@ tts_pid_matches() {
 # a path ending in /NAME. This rejects reused PIDs such as "vim tts-hook.sh".
 tts_pid_runs_script() {
   local cmd words
-  cmd=$(ps -p "$1" -o command= 2>/dev/null) || return 1
+  cmd=$(tts_pid_command "$1") || return 1
   read -r -a words <<< "$cmd"
   [[ ${#words[@]} -ge 2 ]] || return 1
   case "${words[0]##*/}" in
