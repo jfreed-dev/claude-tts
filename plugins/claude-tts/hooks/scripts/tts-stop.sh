@@ -45,7 +45,12 @@ rm -rf "$TTS_DAEMON_LOCK" "$TTS_SEQ_LOCK"
 # Use find instead of glob to avoid zsh nomatch errors
 find "${TTS_QUEUE_DIR}" -maxdepth 1 -type f \( -name "*.mp3" -o -name "*.wav" -o -name ".seq" \) -delete 2>/dev/null || true
 
-# Release hook lock since we killed the worker
-rm -rf "$TTS_HOOK_LOCK" 2>/dev/null || true
+# Remove a hook lock left by a hook that died. A live hook holds the lock
+# while it runs this script, so leave that one alone.
+tts_hook_breaker_clear_stale
+tts_hook_lock_clear_stale || true
+# Temp PID files from hooks killed before they could delete them. Live ones
+# exist for at most a few seconds, so anything over a minute old is orphaned.
+find "${TTS_TMP_DIR}" -maxdepth 1 -type f -name 'claude_tts_hook.??????' -mmin +1 -delete 2>/dev/null || true
 
 exit 0

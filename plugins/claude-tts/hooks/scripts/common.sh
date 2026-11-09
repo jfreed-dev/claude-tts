@@ -7,7 +7,8 @@
 
 TTS_TMP_DIR="${TMPDIR:-/tmp}"
 TTS_QUEUE_DIR="${TTS_TMP_DIR}/claude_tts_queue"
-TTS_HOOK_LOCK="${TTS_TMP_DIR}/claude_tts_hook.lock"
+TTS_HOOK_LOCK="${TTS_TMP_DIR}/claude_tts_hook.pid"
+TTS_HOOK_BREAKER="${TTS_TMP_DIR}/claude_tts_hook.break"
 TTS_DAEMON_PID_FILE="${TTS_QUEUE_DIR}/daemon.pid"
 TTS_DAEMON_LOCK="${TTS_QUEUE_DIR}/.daemon_lock"
 TTS_SEQ_FILE="${TTS_QUEUE_DIR}/.seq"
@@ -100,6 +101,81 @@ tts_pid_matches() {
   local cmd
   cmd=$(ps -p "$1" -o command= 2>/dev/null) || return 1
   [[ "$cmd" == *"$2"* ]]
+}
+
+# --- Hook lock ---
+# TTS_HOOK_LOCK is a file holding the PID of the tts-hook.sh that owns it. A
+# hook holds it while it stops old audio and starts its worker, and releases
+# it on exit. Lock files are written to a temp file and hard-linked into
+# place: ln fails if the target exists, so a lock never exists without its
+# PID. Hard links rather than symlinks, because Git Bash on Windows copies
+# files for ln -s.
+
+# tts_pid_runs_script PID NAME: 0 if PID is a bash or sh process running the
+# script NAME, so its command line starts with a shell and ends with NAME or
+# a path ending in /NAME. This rejects reused PIDs such as "vim tts-hook.sh".
+tts_pid_runs_script() {
+  local cmd words
+  cmd=$(ps -p "$1" -o command= 2>/dev/null) || return 1
+  read -r -a words <<< "$cmd"
+  [[ ${#words[@]} -ge 2 ]] || return 1
+  case "${words[0]##*/}" in
+    bash|sh) ;;
+    *) return 1 ;;
+  esac
+  case "${words[${#words[@]}-1]}" in
+    "$2"|*/"$2") return 0 ;;
+  esac
+  return 1
+}
+
+# tts_hook_lock_live [FILE]: 0 if FILE (default TTS_HOOK_LOCK) holds the PID
+# of a running tts-hook.sh.
+tts_hook_lock_live() {
+  local pid
+  pid=$(tts_read_pid "${1:-$TTS_HOOK_LOCK}") || return 1
+  tts_pid_runs_script "$pid" tts-hook.sh
+}
+
+# tts_hook_lock_clear_stale: remove the hook lock if no running tts-hook.sh
+# owns it. Returns 0 if it removed one.
+# The removal runs under a second lock, TTS_HOOK_BREAKER, held for a few
+# milliseconds, and rechecks the hook lock there. While the breaker is held
+# the hook lock can only be created (when absent) or released by its live
+# owner, so a lock found stale under the breaker is still stale when removed.
+# Without the breaker, two hooks could both see the same stale lock and the
+# second removal could delete the lock the first had just taken.
+tts_hook_lock_clear_stale() {
+  local tmp removed=1
+  [[ -e "$TTS_HOOK_LOCK" ]] || return 1
+  tts_hook_lock_live && return 1
+  tmp=$(mktemp "${TTS_TMP_DIR}/claude_tts_hook.XXXXXX") || return 1
+  echo $$ > "$tmp"
+  if ln "$tmp" "$TTS_HOOK_BREAKER" 2>/dev/null; then
+    if [[ -e "$TTS_HOOK_LOCK" ]] && ! tts_hook_lock_live; then
+      rm -f "$TTS_HOOK_LOCK"
+      removed=0
+    fi
+    rm -f "$TTS_HOOK_BREAKER"
+  fi
+  rm -f "$tmp"
+  return $removed
+}
+
+# tts_hook_breaker_clear_stale: remove a breaker whose holder died inside its
+# few milliseconds. Only tts-stop.sh calls this, never a hook: removing a
+# breaker without holding it is the same race the breaker prevents, so it is
+# left to stop, which runs on every new prompt when no hooks are contending.
+# Until then, hooks that find the hook lock stale wait and give up.
+tts_hook_breaker_clear_stale() {
+  local pid
+  [[ -e "$TTS_HOOK_BREAKER" ]] || return 0
+  if pid=$(tts_read_pid "$TTS_HOOK_BREAKER") &&
+    { tts_pid_runs_script "$pid" tts-hook.sh || tts_pid_runs_script "$pid" tts-stop.sh; }; then
+    return 0
+  fi
+  rm -f "$TTS_HOOK_BREAKER"
+  return 0
 }
 
 # tts_kill_tree PID: SIGSTOP PID so it cannot fork, kill its descendants
