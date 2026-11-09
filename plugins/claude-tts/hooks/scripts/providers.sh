@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # providers.sh: the single definition of every TTS provider, shared by
-# tts-worker.sh and tts-setup.sh.
+# tts-worker.sh and tts-setup.sh: metadata, setup metadata (usage text, key
+# URLs, config file contents) and synthesis.
 # Requires platform.sh to be sourced first (uses file_size).
 # Top level holds only constants and function definitions, so it is safe to
 # source under set -euo pipefail.
@@ -15,6 +16,11 @@ TTS_SYNTH_VERBOSE=0
 # Set by tts_synth: the HTTP status for API providers, or 200/000 from the
 # exit status of CLI and Python providers.
 TTS_HTTP_CODE=""
+
+# Temp files of the synthesis in progress, so tts_synth_cleanup can remove
+# them if the caller is killed mid-request.
+TTS_SYNTH_TMP_RESPONSE=""
+TTS_SYNTH_TMP_PCM=""
 
 TTS_TADA_CACHE="$HOME/.claude/tada-prompt-cache.pt"
 
@@ -71,6 +77,112 @@ tts_provider_audio_ext() {
   return 0
 }
 
+# --- Setup metadata ---
+# Used by tts-setup.sh for its usage list, key URL and config file.
+
+# Prints the one-line summary setup lists for a provider (empty if unknown).
+# commands/tts-setup.md must list the same text; tests/consistency.bats
+# checks it.
+tts_provider_summary() {
+  case "$1" in
+    elevenlabs) printf '%s' "ElevenLabs TTS (high quality)" ;;
+    openai)     printf '%s' "OpenAI TTS" ;;
+    google)     printf '%s' "Google Cloud Text-to-Speech" ;;
+    amazon)     printf '%s' "Amazon Polly (uses AWS CLI creds, no key needed)" ;;
+    edge)       printf '%s' "Microsoft Edge TTS (free, no key needed)" ;;
+    kitten)     printf '%s' "Kitten TTS V0.8 (free, local, no key needed)" ;;
+    mimo)       printf '%s' "Xiaomi MiMo-V2-TTS (expressive, free limited time)" ;;
+    tada)       printf '%s' "Hume TADA (open-source, GPU recommended, optional voice cloning)" ;;
+    fish)       printf '%s' "Fish Audio TTS (high quality, multilingual, voice cloning)" ;;
+    gemini)     printf '%s' "Google Gemini 3.1 Flash TTS (70+ languages, multi-speaker)" ;;
+    local)      printf '%s' "System built-in TTS (macOS say / espeak / Windows SAPI)" ;;
+  esac
+  return 0
+}
+
+# Prints where to get an API key (empty for keyless providers).
+tts_provider_key_url() {
+  case "$1" in
+    elevenlabs) printf '%s' "https://elevenlabs.io/app/settings/api-keys" ;;
+    openai)     printf '%s' "https://platform.openai.com/api-keys" ;;
+    google)     printf '%s' "https://console.cloud.google.com/apis/credentials" ;;
+    mimo)       printf '%s' "https://platform.xiaomimimo.com/#/console/api-keys" ;;
+    fish)       printf '%s' "https://fish.audio (Dashboard → API Keys)" ;;
+    gemini)     printf '%s' "https://aistudio.google.com/apikey" ;;
+  esac
+  return 0
+}
+
+# Prints the optional front matter fields setup writes, from "voice" and
+# "model" (empty for none). provider, and api_key when tts_provider_needs_key,
+# are always written.
+tts_provider_config_fields() {
+  case "$1" in
+    kitten) printf '%s' "voice" ;;
+    mimo|fish|gemini|tada) printf '%s' "voice model" ;;
+  esac
+  return 0
+}
+
+# Prints the config file lines that follow the front matter.
+tts_provider_config_notes() {
+  case "$1" in
+    elevenlabs|openai|google)
+      printf 'Claude TTS configuration. Provider: %s.\n' "$1"
+      printf '%s\n' 'Edit voice_id and model_id above to customize.'
+      ;;
+    amazon)
+      printf '%s\n' \
+        'Claude TTS configuration. Provider: Amazon Polly.' \
+        'Uses AWS CLI credentials (aws configure).'
+      ;;
+    edge)
+      printf '%s\n' \
+        'Claude TTS configuration. Provider: Microsoft Edge TTS.' \
+        'Requires: pip install edge-tts'
+      ;;
+    kitten)
+      printf '%s\n' \
+        'Claude TTS configuration. Provider: Kitten TTS V0.8.' \
+        'Requires: pip install KittenTTS soundfile' \
+        'System dep: espeak (brew install espeak / apt install espeak)' \
+        'Voices: expr-voice-2-m, expr-voice-2-f, expr-voice-3-m, expr-voice-3-f, expr-voice-4-m, expr-voice-4-f, expr-voice-5-m, expr-voice-5-f'
+      ;;
+    mimo)
+      printf '%s\n' \
+        'Claude TTS configuration. Provider: Xiaomi MiMo-V2-TTS.' \
+        'Voices: mimo_default, default_zh (Chinese female), default_en (English female)' \
+        'Style: prefix text with <style>Happy</style> etc. for expressive speech.'
+      ;;
+    tada)
+      printf '%s\n' \
+        'Claude TTS configuration. Provider: Hume TADA (open-source voice cloning).' \
+        'Requires: pip install hume-tada' \
+        'voice_id: path to reference WAV file (voice to clone)' \
+        'model_id: tada-1b (English, smaller) or tada-3b-ml (multilingual, larger)' \
+        'GPU recommended (CUDA or Apple MPS). CPU works but is slow.'
+      ;;
+    fish)
+      printf '%s\n' \
+        'Claude TTS configuration. Provider: Fish Audio.' \
+        'voice_id: reference voice ID (leave empty for default, or use a voice ID from fish.audio)' \
+        'model_id: s2-pro (flagship) or s2 (faster)' \
+        'Supports 80+ languages, voice cloning, and emotional tags like [excited] [whisper].'
+      ;;
+    gemini)
+      printf '%s\n' \
+        'Claude TTS configuration. Provider: Google Gemini 3.1 Flash TTS.' \
+        'voice_id: Kore (default). Available voices: Zephyr, Puck, Charon, Kore, Fenrir, Leda, Orus, Aoede, Callirrhoe, Autonoe, Enceladus, Iapetus, Umbriel, Algieba, Despina, Erinome, Algenib, Rasalgethi, Laomedeia, Achernar, Alnilam, Schedar, Gacrux, Pulcherrima, Achird, Zubenelgenubi, Vindemiatrix, Sadachbia, Sadaltager, Sulafat' \
+        'model_id: gemini-3.1-flash-tts-preview (latest) or gemini-2.5-flash-preview-tts or gemini-2.5-pro-preview-tts' \
+        'Supports 70+ languages, multi-speaker dialogue, and audio tags like [whispers] [laughs].'
+      ;;
+    local)
+      printf '%s\n' 'Claude TTS configuration. Provider: local system TTS.'
+      ;;
+  esac
+  return 0
+}
+
 tts_validate_audio() {
   local file="$1"
   if [[ ! -f "$file" ]]; then
@@ -92,16 +204,27 @@ tts_validate_audio() {
 # OUTFILE is removed. Sets TTS_HTTP_CODE.
 tts_synth() {
   TTS_HTTP_CODE="000"
-  local provider="$1"
+  local provider="$1" rc=0
   shift
   case "$provider" in
     elevenlabs|openai|google|amazon|edge|kitten|mimo|tada|fish|gemini)
-      "_tts_synth_${provider}" "$@"
+      "_tts_synth_${provider}" "$@" || rc=$?
       ;;
     *)
       return 1
       ;;
   esac
+  tts_synth_cleanup
+  return "$rc"
+}
+
+# Removes the temp files recorded by the synthesis in progress. Safe in an
+# EXIT trap: it always returns 0, so it never changes the exit status under
+# set -e.
+tts_synth_cleanup() {
+  if [[ -n "$TTS_SYNTH_TMP_RESPONSE" ]]; then rm -f "$TTS_SYNTH_TMP_RESPONSE"; fi
+  if [[ -n "$TTS_SYNTH_TMP_PCM" ]]; then rm -f "$TTS_SYNTH_TMP_PCM"; fi
+  TTS_SYNTH_TMP_RESPONSE=""; TTS_SYNTH_TMP_PCM=""; return 0
 }
 
 # _tts_http_post OUTFILE URL BODY HEADER... (callers pass at least two headers)
@@ -173,6 +296,7 @@ _tts_synth_google() {
 
   local tmp_response
   tmp_response=$(mktemp "${TMPDIR:-/tmp}/claude_tts_gcloud.XXXXXX")
+  TTS_SYNTH_TMP_RESPONSE="$tmp_response"
 
   TTS_HTTP_CODE=$(_tts_http_post "$tmp_response" "https://texttospeech.googleapis.com/v1/text:synthesize" "$body" \
     "X-Goog-Api-Key: ${key}" \
@@ -264,6 +388,7 @@ _tts_synth_mimo() {
 
   local tmp_response
   tmp_response=$(mktemp "${TMPDIR:-/tmp}/claude_tts_mimo.XXXXXX")
+  TTS_SYNTH_TMP_RESPONSE="$tmp_response"
 
   TTS_HTTP_CODE=$(_tts_http_post "$tmp_response" "https://api.xiaomimimo.com/v1/chat/completions" "$body" \
     "api-key: ${key}" \
@@ -394,6 +519,7 @@ _tts_synth_gemini() {
 
   local tmp_response
   tmp_response=$(mktemp "${TMPDIR:-/tmp}/claude_tts_gemini.XXXXXX")
+  TTS_SYNTH_TMP_RESPONSE="$tmp_response"
 
   TTS_HTTP_CODE=$(_tts_http_post "$tmp_response" "https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent" "$body" \
     "x-goog-api-key: ${key}" \
@@ -407,6 +533,7 @@ _tts_synth_gemini() {
   # Gemini returns base64-encoded PCM (s16le, 24kHz, mono); wrap it in WAV
   local pcm_file
   pcm_file=$(mktemp "${TMPDIR:-/tmp}/claude_tts_pcm.XXXXXX")
+  TTS_SYNTH_TMP_PCM="$pcm_file"
   jq -r '.candidates[0].content.parts[0].inlineData.data' "$tmp_response" 2>/dev/null | base64 -d > "$pcm_file" 2>/dev/null
   rm -f "$tmp_response"
 

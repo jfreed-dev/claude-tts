@@ -12,6 +12,7 @@ Text-to-speech plugin for Claude Code. Automatically speaks Claude's responses a
 | **Amazon Polly** | Good | Paid (free tier available) | AWS CLI configured |
 | **Edge TTS** | Very good | Free | `pip install edge-tts` |
 | **Kitten TTS** | Good | Free | `pip install KittenTTS soundfile` + `espeak` |
+| **Hume TADA** | Very good | Free | `pip install hume-tada` (GPU recommended) |
 | **Fish Audio** | Excellent | Paid (billing required) | API key |
 | **Gemini TTS** | Excellent | Paid (free tier available) | API key |
 | **MiMo TTS** | Excellent | Free (limited time) | API key |
@@ -192,6 +193,10 @@ The hooks exit immediately so Claude Code is never blocked.
 **Windows (Git Bash / WSL)**
 - PowerShell must be available as `powershell.exe`
 - WSL users: audio playback requires PulseAudio or PipeWire bridge to Windows
+
+## Development
+
+Run `bats tests/` (needs `bats` and `jq`; the request transcript test runs on Linux only). CI runs them on every push and pull request. `tests/consistency.bats` fails when the provider list in `hooks/scripts/providers.sh` disagrees with this README, `commands/tts-setup.md` or the manifests. After an intended behavior change, regenerate the transcript with `bash tests/capture-requests.sh --update` and review `git diff --name-status -- tests/golden`.
 
 ## License
 

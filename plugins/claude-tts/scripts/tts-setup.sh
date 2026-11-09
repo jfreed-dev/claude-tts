@@ -23,17 +23,7 @@ if [[ -z "$PROVIDER" ]]; then
   echo "Usage: tts-setup <provider> [api-key]"
   echo ""
   echo "Providers:"
-  echo "  elevenlabs  — ElevenLabs TTS (high quality)"
-  echo "  openai      — OpenAI TTS"
-  echo "  google      — Google Cloud Text-to-Speech"
-  echo "  amazon      — Amazon Polly (uses AWS CLI creds)"
-  echo "  edge        — Microsoft Edge TTS (free, no key needed)"
-  echo "  kitten      — Kitten TTS V0.8 (free, local, no key needed)"
-  echo "  mimo        — Xiaomi MiMo-V2-TTS (expressive, free limited time)"
-  echo "  tada        — Hume TADA (open-source, GPU recommended, optional voice cloning)"
-  echo "  fish        — Fish Audio TTS (high quality, multilingual, voice cloning)"
-  echo "  gemini      — Google Gemini 3.1 Flash TTS (70+ languages, multi-speaker)"
-  echo "  local       — System built-in TTS (free, no key needed)"
+  for p in $TTS_PROVIDERS; do printf '  %-12s— %s\n' "$p" "$(tts_provider_summary "$p")"; done
   echo ""
   echo "Examples:"
   echo "  /claude-tts:tts-setup elevenlabs sk_abc123"
@@ -61,99 +51,15 @@ fi
 if tts_provider_needs_key "$PROVIDER" && [[ -z "$API_KEY" ]]; then
   echo "ERROR: API key required for $PROVIDER"
   echo ""
-  case "$PROVIDER" in
-    elevenlabs) echo "Get your key at: https://elevenlabs.io/app/settings/api-keys" ;;
-    openai)     echo "Get your key at: https://platform.openai.com/api-keys" ;;
-    google)     echo "Get your key at: https://console.cloud.google.com/apis/credentials" ;;
-    mimo)       echo "Get your key at: https://platform.xiaomimimo.com/#/console/api-keys" ;;
-    fish)       echo "Get your key at: https://fish.audio (Dashboard → API Keys)" ;;
-    gemini)     echo "Get your key at: https://aistudio.google.com/apikey" ;;
-  esac
+  KEY_URL=$(tts_provider_key_url "$PROVIDER")
+  if [[ -n "$KEY_URL" ]]; then echo "Get your key at: $KEY_URL"; fi
   exit 1
 fi
 
 # Write config file
 mkdir -p "$TTS_CLAUDE_DIR"
-if [[ "$PROVIDER" == "local" ]]; then
-  cat > "$TTS_CONFIG_FILE" << EOF
----
-provider: "local"
----
-
-Claude TTS configuration. Provider: local system TTS.
-EOF
-elif [[ "$PROVIDER" == "amazon" ]]; then
-  cat > "$TTS_CONFIG_FILE" << EOF
----
-provider: "amazon"
----
-
-Claude TTS configuration. Provider: Amazon Polly.
-Uses AWS CLI credentials (aws configure).
-EOF
-elif [[ "$PROVIDER" == "edge" ]]; then
-  cat > "$TTS_CONFIG_FILE" << EOF
----
-provider: "edge"
----
-
-Claude TTS configuration. Provider: Microsoft Edge TTS.
-Requires: pip install edge-tts
-EOF
-elif [[ "$PROVIDER" == "kitten" ]]; then
-  cat > "$TTS_CONFIG_FILE" << EOF
----
-provider: "kitten"
-voice_id: "expr-voice-2-f"
----
-
-Claude TTS configuration. Provider: Kitten TTS V0.8.
-Requires: pip install KittenTTS soundfile
-System dep: espeak (brew install espeak / apt install espeak)
-Voices: expr-voice-2-m, expr-voice-2-f, expr-voice-3-m, expr-voice-3-f, expr-voice-4-m, expr-voice-4-f, expr-voice-5-m, expr-voice-5-f
-EOF
-elif [[ "$PROVIDER" == "mimo" ]]; then
-  cat > "$TTS_CONFIG_FILE" << EOF
----
-provider: "mimo"
-api_key: "${API_KEY}"
-voice_id: "mimo_default"
-model_id: "mimo-v2-tts"
----
-
-Claude TTS configuration. Provider: Xiaomi MiMo-V2-TTS.
-Voices: mimo_default, default_zh (Chinese female), default_en (English female)
-Style: prefix text with <style>Happy</style> etc. for expressive speech.
-EOF
-elif [[ "$PROVIDER" == "fish" ]]; then
-  cat > "$TTS_CONFIG_FILE" << EOF
----
-provider: "fish"
-api_key: "${API_KEY}"
-voice_id: ""
-model_id: "s2-pro"
----
-
-Claude TTS configuration. Provider: Fish Audio.
-voice_id: reference voice ID (leave empty for default, or use a voice ID from fish.audio)
-model_id: s2-pro (flagship) or s2 (faster)
-Supports 80+ languages, voice cloning, and emotional tags like [excited] [whisper].
-EOF
-elif [[ "$PROVIDER" == "gemini" ]]; then
-  cat > "$TTS_CONFIG_FILE" << EOF
----
-provider: "gemini"
-api_key: "${API_KEY}"
-voice_id: "Kore"
-model_id: "gemini-3.1-flash-tts-preview"
----
-
-Claude TTS configuration. Provider: Google Gemini 3.1 Flash TTS.
-voice_id: Kore (default). Available voices: Zephyr, Puck, Charon, Kore, Fenrir, Leda, Orus, Aoede, Callirrhoe, Autonoe, Enceladus, Iapetus, Umbriel, Algieba, Despina, Erinome, Algenib, Rasalgethi, Laomedeia, Achernar, Alnilam, Schedar, Gacrux, Pulcherrima, Achird, Zubenelgenubi, Vindemiatrix, Sadachbia, Sadaltager, Sulafat
-model_id: gemini-3.1-flash-tts-preview (latest) or gemini-2.5-flash-preview-tts or gemini-2.5-pro-preview-tts
-Supports 70+ languages, multi-speaker dialogue, and audio tags like [whispers] [laughs].
-EOF
-elif [[ "$PROVIDER" == "tada" ]]; then
+CONFIG_VOICE=$(tts_provider_default voice "$PROVIDER")
+if [[ "$PROVIDER" == "tada" ]]; then
   # Second arg (API_KEY) is repurposed as reference audio path for TADA
   ref_audio="${API_KEY:-$HOME/.claude/tada-reference.wav}"
   # Generate default reference audio if none provided
@@ -171,30 +77,22 @@ elif [[ "$PROVIDER" == "tada" ]]; then
   fi
   # Remove stale prompt cache when reference changes
   rm -f "$TTS_TADA_CACHE"
-  cat > "$TTS_CONFIG_FILE" << EOF
----
-provider: "tada"
-voice_id: "${ref_audio}"
-model_id: "tada-1b"
----
-
-Claude TTS configuration. Provider: Hume TADA (open-source voice cloning).
-Requires: pip install hume-tada
-voice_id: path to reference WAV file (voice to clone)
-model_id: tada-1b (English, smaller) or tada-3b-ml (multilingual, larger)
-GPU recommended (CUDA or Apple MPS). CPU works but is slow.
-EOF
-else
-  cat > "$TTS_CONFIG_FILE" << EOF
----
-provider: "${PROVIDER}"
-api_key: "${API_KEY}"
----
-
-Claude TTS configuration. Provider: ${PROVIDER}.
-Edit voice_id and model_id above to customize.
-EOF
+  CONFIG_VOICE="$ref_audio"
 fi
+{
+  echo "---"
+  printf 'provider: "%s"\n' "$PROVIDER"
+  if tts_provider_needs_key "$PROVIDER"; then printf 'api_key: "%s"\n' "$API_KEY"; fi
+  for field in $(tts_provider_config_fields "$PROVIDER"); do
+    case "$field" in
+      voice) printf 'voice_id: "%s"\n' "$CONFIG_VOICE" ;;
+      model) printf 'model_id: "%s"\n' "$(tts_provider_default model "$PROVIDER")" ;;
+    esac
+  done
+  echo "---"
+  echo ""
+  tts_provider_config_notes "$PROVIDER"
+} > "$TTS_CONFIG_FILE"
 
 echo "Config written to: $TTS_CONFIG_FILE"
 
