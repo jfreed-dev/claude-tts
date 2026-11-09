@@ -181,13 +181,32 @@ no_lock_leftovers() {
   [ ! -e "$LOCK" ]
 }
 
-@test "a stale breaker left by a dead process is cleared" {
+@test "a hook leaves a stale breaker alone; tts-stop.sh clears it" {
   echo 99999999 > "${TMPD}/claude_tts_hook.break"
   echo 99999999 > "$LOCK"
-  run hook "after a stale breaker"
+  run hook "blocked by a stale breaker"
   [ "$status" -eq 0 ]
-  wait_for_worker "after a stale breaker"
+  [ ! -e "$WORKER_LOG" ]
+  [ "$(cat "${TMPD}/claude_tts_hook.break")" = 99999999 ]
+  run stop
+  [ "$status" -eq 0 ]
   no_lock_leftovers
+  run hook "blocked by a stale breaker"
+  [ "$status" -eq 0 ]
+  wait_for_worker "blocked by a stale breaker"
+}
+
+@test "a lock holding the PID of a program that names tts-hook.sh is taken over" {
+  : > "${BATS_TEST_TMPDIR}/fake/tts-hook.sh"
+  tail -f "${BATS_TEST_TMPDIR}/fake/tts-hook.sh" > /dev/null 3>&- &
+  local other=$!
+  BG_PIDS="$BG_PIDS $other"
+  echo "$other" > "$LOCK"
+  run hook "after tail of tts-hook.sh"
+  [ "$status" -eq 0 ]
+  wait_for_worker "after tail of tts-hook.sh"
+  no_lock_leftovers
+  kill -0 "$other"
 }
 
 @test "eight hooks racing a stale lock never run the stop section together" {

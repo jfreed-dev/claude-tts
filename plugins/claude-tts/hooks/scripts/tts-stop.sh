@@ -47,6 +47,7 @@ find "${TTS_QUEUE_DIR}" -maxdepth 1 -type f \( -name "*.mp3" -o -name "*.wav" -o
 
 # Remove a hook lock left by a hook that died. A live hook holds the lock
 # while it runs this script, so leave that one alone.
+tts_hook_breaker_clear_stale
 tts_hook_lock_clear_stale || true
 
 exit 0
