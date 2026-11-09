@@ -21,10 +21,11 @@ echo $$ > "$TTS_DAEMON_PID_FILE"
 cleanup() {
   # Kill the whole subtree: the play subshell and the audio player under it
   tts_kill_children $$
-  rm -f "$TTS_PLAYER_PID_FILE"
-  # Remove the pid file, lock and queued audio only while the pid file still
-  # names this daemon, so a late cleanup cannot undo a newer daemon's state
+  # Remove the player and daemon pid files, the lock and queued audio only
+  # while the pid file still names this daemon, so a late cleanup cannot undo
+  # a newer daemon's state
   if [[ "$(tts_read_pid "$TTS_DAEMON_PID_FILE")" == "$$" ]]; then
+    rm -f "$TTS_PLAYER_PID_FILE"
     rm -f "$TTS_DAEMON_PID_FILE"
     rm -rf "$TTS_DAEMON_LOCK"
     # Clear remaining queued audio files (use find to avoid zsh glob issues)

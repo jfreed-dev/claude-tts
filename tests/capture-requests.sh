@@ -471,6 +471,45 @@ stop_daemon() {
   reap_case
 }
 
+# daemon_term LABEL LATE: the real daemon plays a hanging mpv and gets a
+# direct SIGTERM by PID, as in the README's manual kill; tts-stop.sh is not
+# run. With LATE=true, daemon.pid is first rewritten to the decoy's PID, as if
+# a newer daemon had started, so cleanup must leave the queue state alone.
+daemon_term() {
+  local label="$1" late="$2" q
+  stop_case "$label"
+  q="${T}/tmp/claude_tts_queue"
+  : > "${q}/000001.mp3"
+  : > "${q}/000002.wav"
+  start_decoy
+  bg_start daemon "$DAEMON" STUB_HANG=30 --
+  wait_for_file "${T}/pids/mpv.pid"
+  wait_for_file "${T}/pids/mpv.child.pid"
+  if [[ "$late" == true ]]; then
+    cat "${T}/bg/decoy.pid" > "${q}/daemon.pid"
+  fi
+  kill -TERM "$(cat "${T}/bg/daemon.pid")"
+  expect_dead daemon "$(cat "${T}/bg/daemon.pid")"
+  expect_dead mpv "$(cat "${T}/pids/mpv.pid")"
+  expect_dead "mpv child" "$(cat "${T}/pids/mpv.child.pid")"
+  expect_alive decoy "$(cat "${T}/bg/decoy.pid")"
+  expect_alive "decoy child" "$(cat "${T}/pids/decoy.child")"
+  if [[ "$late" == true ]]; then
+    if [[ "$(cat "${q}/daemon.pid")" == "$(cat "${T}/bg/decoy.pid")" ]]; then
+      echo "daemon.pid: still names the newer daemon"
+    else
+      echo "daemon.pid: changed"
+    fi
+  fi
+  echo "--- daemon output"
+  normalize < "${T}/daemon.out"
+  echo "--- queue"
+  find "${T}/tmp/claude_tts_queue" -mindepth 1 -maxdepth 1 -exec basename {} \; | sort
+  echo "--- stub log"
+  normalize < "${T}/stub.log"
+  reap_case
+}
+
 # stop_worker LABEL CONFIG STUB: a real worker hangs in STUB (curl or
 # espeak-ng). daemon.pid names the decoy, a live process that is not ours.
 stop_worker() {
@@ -656,6 +695,21 @@ api_key: \"KEY-openai\"" curl
     echo "enabled flag: removed"
   fi
   report false
+
+  daemon_term "daemon-direct-term" false
+  daemon_term "daemon-late-cleanup" true
+
+  # A worker pid file naming a live process that is not a worker: stop must
+  # leave the process alone and remove the file.
+  stop_case "stale-worker-pid-foreign"
+  ( env -i PATH="$PATH" TTS_CAPTURE_ROOT="$ROOT" sleep 60 > /dev/null 2>&1 &
+    echo $! > "${T}/bg/foreign.pid" )
+  wait_for_file "${T}/bg/foreign.pid"
+  cat "${T}/bg/foreign.pid" > "${T}/tmp/claude_tts_queue/worker.$(cat "${T}/bg/foreign.pid").pid"
+  run_stop
+  expect_alive "foreign process" "$(cat "${T}/bg/foreign.pid")"
+  report false
+  reap_case
 }
 
 # split_transcript DIR: read a transcript on stdin and write DIR/scenarios.txt

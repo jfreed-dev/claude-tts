@@ -96,3 +96,6 @@ stop_worker-local-tts-in-flight
 stop_nothing-running
 stop_tts-stop-command
 stop_tts-off-command
+stop_daemon-direct-term
+stop_daemon-late-cleanup
+stop_stale-worker-pid-foreign

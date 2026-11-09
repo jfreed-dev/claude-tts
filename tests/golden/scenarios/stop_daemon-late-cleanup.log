@@ -1,0 +1,19 @@
+##### stop: daemon-late-cleanup
+decoy comm: mpv
+daemon: dead
+mpv: dead
+mpv child: dead
+decoy: alive
+decoy child: alive
+daemon.pid: still names the newer daemon
+--- daemon output
+--- queue
+.daemon_lock
+000001.mp3
+000002.wav
+daemon.pid
+player.pid
+--- stub log
+=== mpv
+[--no-terminal]
+[<T>/tmp/claude_tts_queue/000001.mp3]
