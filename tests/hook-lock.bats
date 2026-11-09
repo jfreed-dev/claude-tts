@@ -209,6 +209,17 @@ no_lock_leftovers() {
   kill -0 "$other"
 }
 
+@test "tts-stop.sh sweeps orphaned hook temp files older than a minute" {
+  echo 99999999 > "${TMPD}/claude_tts_hook.AAAAAA"
+  touch -t 202001010000 "${TMPD}/claude_tts_hook.AAAAAA"
+  echo 99999999 > "${TMPD}/claude_tts_hook.BBBBBB"
+  run stop
+  [ "$status" -eq 0 ]
+  [ ! -e "${TMPD}/claude_tts_hook.AAAAAA" ]
+  # A fresh one may belong to a hook that is running now
+  [ -e "${TMPD}/claude_tts_hook.BBBBBB" ]
+}
+
 @test "eight hooks racing a stale lock never run the stop section together" {
   # Replace tts-stop.sh with a probe that records any overlap
   cat > "$S/tts-stop.sh" <<PROBE

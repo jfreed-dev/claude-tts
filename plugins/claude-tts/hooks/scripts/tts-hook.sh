@@ -47,6 +47,8 @@ acquire_hook_lock() {
   while (( tries < 50 )); do
     tries=$((tries + 1))
     if ln "$HOOK_LOCK_TMP" "$TTS_HOOK_LOCK" 2>/dev/null; then
+      # The lock is its own link to the file, so the temp name can go now
+      rm -f "$HOOK_LOCK_TMP"
       return 0
     fi
     # The owner died, or its PID now belongs to another program
