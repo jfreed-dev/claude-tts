@@ -102,6 +102,15 @@ tts_pid_matches() {
   [[ "$cmd" == *"$2"* ]]
 }
 
+# tts_hook_lock_live: 0 if the hook lock holds the PID of a running
+# tts-hook.sh. The lock is held only while a hook stops old audio and starts
+# its worker; tts-hook.sh takes it and releases it on exit.
+tts_hook_lock_live() {
+  local pid
+  pid=$(tts_read_pid "$TTS_HOOK_LOCK/pid") || return 1
+  tts_pid_matches "$pid" tts-hook.sh
+}
+
 # tts_kill_tree PID: SIGSTOP PID so it cannot fork, kill its descendants
 # depth-first, then SIGTERM and SIGCONT PID. Never signals $$. Returns 0.
 tts_kill_tree() {

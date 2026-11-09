@@ -11,7 +11,7 @@
     {
       "name": "claude-tts",
       "description": "Text-to-speech for Claude Code responses with multi-provider support (ElevenLabs, OpenAI, Google, Amazon Polly, Edge TTS, Kitten TTS, MiMo TTS, Hume TADA, Fish Audio, Gemini TTS, local system TTS)",
-      "version": "3.0.0",
+      "version": "3.0.1",
       "author": {
         "name": "Youssef"
       },

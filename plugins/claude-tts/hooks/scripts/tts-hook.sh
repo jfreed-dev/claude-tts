@@ -33,19 +33,49 @@ fi
 # Clean up previous dedup markers (keep only current)
 find "${TTS_TMP_DIR}" -maxdepth 1 -name "claude_tts_dedup_*" -not -name "claude_tts_dedup_${MSG_HASH}" -exec rm -rf {} + 2>/dev/null || true
 
-# Process-level lock to serialize hook execution
-if [[ -d "$TTS_HOOK_LOCK" ]]; then
-  LOCK_PID=$(cat "$TTS_HOOK_LOCK/pid" 2>/dev/null || echo "")
-  if [[ -n "$LOCK_PID" ]] && kill -0 "$LOCK_PID" 2>/dev/null; then
-    exit 0
+# Hook lock: serializes the stop-then-spawn section below so two hooks
+# cannot both start workers. Only a running tts-hook.sh holds it, from here
+# until it exits. A hook that finds the lock held waits for it, then stops the
+# holder's audio and speaks its own message: the newest reply wins.
+acquire_hook_lock() {
+  local tries=0 pidless=0
+  while (( tries < 50 )); do
+    tries=$((tries + 1))
+    if mkdir "$TTS_HOOK_LOCK" 2>/dev/null; then
+      echo $$ > "$TTS_HOOK_LOCK/pid"
+      return 0
+    fi
+    if tts_hook_lock_live; then
+      pidless=0
+    elif [[ -f "$TTS_HOOK_LOCK/pid" ]]; then
+      # The holder died or its PID now belongs to another program
+      rm -rf "$TTS_HOOK_LOCK"
+      continue
+    else
+      # No pid file: the holder may be between mkdir and writing its PID.
+      # Treat the lock as abandoned only if it is still missing next poll.
+      pidless=$((pidless + 1))
+      if (( pidless >= 2 )); then
+        rm -rf "$TTS_HOOK_LOCK"
+        pidless=0
+        continue
+      fi
+    fi
+    sleep 0.1
+  done
+  return 1
+}
+
+release_hook_lock() {
+  if [[ "$(cat "$TTS_HOOK_LOCK/pid" 2>/dev/null)" == "$$" ]]; then
+    rm -rf "$TTS_HOOK_LOCK"
   fi
-  rm -rf "$TTS_HOOK_LOCK"
-fi
-if ! mkdir "$TTS_HOOK_LOCK" 2>/dev/null; then
-  exit 0
-fi
-echo $$ > "$TTS_HOOK_LOCK/pid"
-trap - EXIT
+  return 0
+}
+
+# Give up after about 5 s, well inside the hook's 10 s timeout
+acquire_hook_lock || exit 0
+trap release_hook_lock EXIT
 
 # Stop any currently playing TTS before starting new
 "${SCRIPT_DIR}/tts-stop.sh" &>/dev/null || true
@@ -56,9 +86,5 @@ echo "$MESSAGE" > "$TEMP_FILE"
 
 # Fork background worker and exit immediately
 "${SCRIPT_DIR}/tts-worker.sh" "$TEMP_FILE" &>/dev/null & disown
-WORKER_PID=$!
-
-# Update lock with worker PID so concurrent invocations see the worker is alive
-echo "$WORKER_PID" > "$TTS_HOOK_LOCK/pid"
 
 exit 0
